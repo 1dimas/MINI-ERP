@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strictPropertyInitialization": false,
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -7,7 +10,7 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "module": "esnext",
+    "module": "preserve",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -20,7 +23,10 @@
     ],
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "next-env.d.ts",

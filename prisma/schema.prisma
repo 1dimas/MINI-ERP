@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- MODUL AUTH & 2FA ---
+model User {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  name                String
+  password            String   
+  role                String   @default("KASIR") // "OWNER", "FINANCE", "KASIR"
+  isTwoFactorEnabled  Boolean  @default(false)
+  twoFactorSecret     String?  
+}
+
+// --- MODUL 1: BAGAN AKUN (COA) ---
+model ChartOfAccount {
+  code          String        @id
+  name          String
+  type          String        // ASET, KEWAJIBAN, EKUITAS, PENDAPATAN, BEBAN
+  normalBalance String        // DEBIT, KREDIT
+  isProtected   Boolean       @default(false)
+  
+  journalLines  JournalLine[]
+}
+
+// --- MODUL 4: JURNAL UMUM ---
+model JournalEntry {
+  id          String        @id @default(uuid())
+  tanggal     DateTime      @default(now())
+  keterangan  String
+  sourceType  String        // "POS", "SERVICE", "CASHFLOW", "MANUAL"
+  sourceId    String?       
+  status      String        @default("POSTED") // "DRAFT", "POSTED"
+  total       Decimal       @db.Decimal(15, 2)
+  isEdited    Boolean       @default(false)
+  
+  lines       JournalLine[]
+}
+
+model JournalLine {
+  id           String         @id @default(uuid())
+  entryId      String
+  accountCode  String
+  side         String         // "DEBIT", "KREDIT"
+  nominal      Decimal        @db.Decimal(15, 2)
+  
+  entry        JournalEntry   @relation(fields: [entryId], references: [id])
+  account      ChartOfAccount @relation(fields: [accountCode], references: [code])
+}
+
+// --- MODUL KASIR & INVENTARIS MVP ---
+model Product {
+  id          String    @id @default(uuid())
+  sku         String    @unique 
+  name        String
+  hpp         Decimal   @db.Decimal(15, 2) 
+  price       Decimal   @db.Decimal(15, 2) 
+  stock       Int       @default(0)
+}
+
+model PosTransaction {
+  id          String    @id @default(uuid())
+  tanggal     DateTime  @default(now())
+  productId   String
+  qty         Int
+  totalPrice  Decimal   @db.Decimal(15, 2)
+  totalHpp    Decimal   @db.Decimal(15, 2) 
+}

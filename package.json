@@ -1,26 +1,49 @@
 {
   "name": "my-toko",
+  "type": "module",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "prisma skills sync || exit 0",
+    "contract:emit": "prisma contract emit"
   },
   "dependencies": {
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/jwt": "^12.0.2",
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^18.0.5",
+    "lucide-react": "^1.49.0",
     "next": "16.3.8",
+    "otplib": "^13.5.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
+    "@prisma/cli-engine": "^0.6.2",
     "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "prisma": "^5.22.0",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }
