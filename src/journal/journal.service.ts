@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { JournalFilterDto } from './dto/journal-filter.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
+import { UpdateManualJournalDto } from './dto/update-manual-journal.dto';
 import { AuditJournalDto, AuditAction } from './dto/audit-journal.dto';
 import { Role } from '../auth/enums/role.enum';
 
@@ -124,6 +125,7 @@ export class JournalService {
           sourceType: 'MANUAL',
           status,
           total: totalDebit,
+          isEdited: false,
           lines: {
             create: dto.lines.map((line) => ({
               accountCode: line.accountCode,
@@ -144,9 +146,98 @@ export class JournalService {
   }
 
   /**
-   * PATCH /journal/audit/:id: Eksekusi Audit (Hanya OWNER)
+   * PUT /journal/:id: Meng-edit transaksi Jurnal Umum (Status DRAFT / POSTED)
+   * Mengeset isEdited = true dan memperbarui baris debit/kredit secara atomik.
+   */
+  async updateManual(
+    id: string,
+    dto: UpdateManualJournalDto,
+    user: { id: string; role: string },
+  ) {
+    if (user.role === Role.KASIR) {
+      throw new ForbiddenException('Akses ditolak. KASIR tidak diizinkan mengedit jurnal.');
+    }
+
+    const existingEntry = await this.prisma.journalEntry.findUnique({
+      where: { id },
+      include: { lines: true },
+    });
+
+    if (!existingEntry) {
+      throw new NotFoundException(`Jurnal dengan ID '${id}' tidak ditemukan.`);
+    }
+
+    let newTotal = Number(existingEntry.total);
+    let newLinesData = undefined;
+
+    if (dto.lines && dto.lines.length > 0) {
+      if (dto.lines.length < 2) {
+        throw new BadRequestException(
+          'Transaksi jurnal minimal terdiri dari 2 akun (Debit & Kredit).',
+        );
+      }
+
+      let totalDebit = 0;
+      let totalKredit = 0;
+      for (const line of dto.lines) {
+        if (line.side === 'DEBIT') totalDebit += Number(line.nominal);
+        else if (line.side === 'KREDIT') totalKredit += Number(line.nominal);
+      }
+
+      if (Math.abs(totalDebit - totalKredit) > 0.001) {
+        throw new BadRequestException(
+          `Total Debit (${totalDebit}) dan Total Kredit (${totalKredit}) tidak seimbang.`,
+        );
+      }
+
+      newTotal = totalDebit;
+      newLinesData = dto.lines;
+    }
+
+    const transDate = dto.tanggal ? new Date(dto.tanggal) : existingEntry.tanggal;
+    const keterangan = dto.keterangan || existingEntry.keterangan;
+
+    // Execute atomic transaction
+    return this.prisma.$transaction(async (tx) => {
+      if (newLinesData) {
+        await tx.journalLine.deleteMany({
+          where: { entryId: id },
+        });
+      }
+
+      return tx.journalEntry.update({
+        where: { id },
+        data: {
+          tanggal: transDate,
+          keterangan,
+          total: newTotal,
+          isEdited: true, // Flag jurnal pernah diedit
+          ...(newLinesData
+            ? {
+                lines: {
+                  create: newLinesData.map((line) => ({
+                    accountCode: line.accountCode,
+                    side: line.side,
+                    nominal: line.nominal,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: {
+          lines: {
+            include: {
+              account: true,
+            },
+          },
+        },
+      });
+    });
+  }
+
+  /**
+   * PATCH /journal/audit/:id: Eksekusi Audit (Bisa dilakukan oleh FINANCE & OWNER)
    * Payload: { "action": "APPROVE" | "REJECT" }
-   * Atomik via prisma.$transaction
    */
   async auditStatus(id: string, auditDto: AuditJournalDto) {
     const entry = await this.prisma.journalEntry.findUnique({
@@ -166,7 +257,6 @@ export class JournalService {
     const newStatus =
       auditDto.action === AuditAction.APPROVE ? 'POSTED' : 'REJECTED';
 
-    // Transaksi Atomik (prisma.$transaction)
     return this.prisma.$transaction(async (tx) => {
       return tx.journalEntry.update({
         where: { id },

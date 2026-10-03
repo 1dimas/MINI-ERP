@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Body,
   Param,
@@ -11,6 +12,7 @@ import {
 import { JournalService } from './journal.service';
 import { JournalFilterDto } from './dto/journal-filter.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
+import { UpdateManualJournalDto } from './dto/update-manual-journal.dto';
 import { AuditJournalDto } from './dto/audit-journal.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -25,7 +27,6 @@ export class JournalController {
 
   /**
    * GET /journal: Tampilkan semua riwayat JournalEntry beserta JournalLine-nya
-   * Filter Query: status (DRAFT/POSTED/REJECTED), sourceType, startDate, endDate
    * Akses: FINANCE & OWNER
    */
   @Get()
@@ -36,7 +37,6 @@ export class JournalController {
 
   /**
    * POST /journal/manual: Buat jurnal manual
-   * Jika role FINANCE -> Otomatis status DRAFT
    * Akses: FINANCE & OWNER
    */
   @Post('manual')
@@ -49,12 +49,25 @@ export class JournalController {
   }
 
   /**
+   * PUT /journal/:id: Meng-edit transaksi Jurnal Umum
+   * Akses: FINANCE & OWNER
+   */
+  @Put(':id')
+  @Roles(Role.FINANCE, Role.OWNER)
+  async updateManual(
+    @Param('id') id: string,
+    @Body() dto: UpdateManualJournalDto,
+    @GetUser() user: { id: string; role: string },
+  ) {
+    return this.journalService.updateManual(id, dto, user);
+  }
+
+  /**
    * PATCH /journal/audit/:id: Eksekusi Audit (APPROVE / REJECT)
-   * Payload: { "action": "APPROVE" | "REJECT" }
-   * Akses: HANYA OWNER
+   * Akses: FINANCE & OWNER
    */
   @Patch('audit/:id')
-  @Roles(Role.OWNER)
+  @Roles(Role.FINANCE, Role.OWNER)
   async auditStatus(
     @Param('id') id: string,
     @Body() auditDto: AuditJournalDto,

@@ -63,76 +63,251 @@ async function main() {
     });
   }
 
-  // Clear previous journals for clean verification
+  // Clear previous units & models for clean seed
+  await prisma.posTransaction.deleteMany({});
+  await prisma.productUnit.deleteMany({});
+  await prisma.productModel.deleteMany({});
   await prisma.journalLine.deleteMany({});
   await prisma.journalEntry.deleteMany({});
 
-  // 3. Journal Entry 1: Modal Awal Rp 10.000.000
+  // 3. Journal Entry 1: Modal Awal Rp 20.000.000
   await prisma.journalEntry.create({
     data: {
       keterangan: 'Setoran Modal Awal Pemilik',
       sourceType: 'MANUAL',
-      total: 10000000,
+      total: 20000000,
       lines: {
         create: [
-          { accountCode: '110', side: 'DEBIT', nominal: 10000000 },
-          { accountCode: '310', side: 'KREDIT', nominal: 10000000 },
+          { accountCode: '110', side: 'DEBIT', nominal: 20000000 },
+          { accountCode: '310', side: 'KREDIT', nominal: 20000000 },
         ],
       },
     },
   });
 
-  // 4. Journal Entry 2: Penjualan Kasir POS Rp 2.500.000
-  await prisma.journalEntry.create({
+  // 4. Seed Data Katalog Induk (ProductModel)
+  const modelThinkpad = await prisma.productModel.create({
     data: {
-      keterangan: 'Penjualan POS Nota #001',
-      sourceType: 'POS',
-      total: 2500000,
-      lines: {
-        create: [
-          { accountCode: '110', side: 'DEBIT', nominal: 2500000 },
-          { accountCode: '410', side: 'KREDIT', nominal: 2500000 },
-        ],
-      },
+      sku: 'L-THINK-T14G2',
+      name: 'Lenovo ThinkPad T14 Gen 2 (i5 11th / 16GB / 512GB)',
+      category: 'LAPTOP',
     },
   });
 
-  // 5. Journal Entry 3: HPP Penjualan Nota #001 Rp 1.500.000
-  await prisma.journalEntry.create({
+  const modelMacbook = await prisma.productModel.create({
     data: {
-      keterangan: 'HPP Penjualan Nota #001',
-      sourceType: 'POS',
-      total: 1500000,
-      lines: {
-        create: [
-          { accountCode: '440', side: 'DEBIT', nominal: 1500000 },
-          { accountCode: '130', side: 'KREDIT', nominal: 1500000 },
-        ],
-      },
+      sku: 'L-MAC-AIRM1',
+      name: 'MacBook Air M1 2020 8GB / 256GB Gray',
+      category: 'LAPTOP',
     },
   });
 
-  // 6. Journal Entry 4: Pembayaran Beban Listrik Rp 300.000
-  await prisma.journalEntry.create({
+  const modelAsusRog = await prisma.productModel.create({
     data: {
-      keterangan: 'Pembayaran PLN Bulan Ini',
-      sourceType: 'CASHFLOW',
-      total: 300000,
+      sku: 'L-ROG-G14',
+      name: 'Asus ROG Zephyrus G14 Ryzen 7 / 16GB / 512GB',
+      category: 'LAPTOP',
+    },
+  });
+
+  // 5. DEMO RELASI 1-TO-MANY: 1 KATALOG INDUK (Lenovo ThinkPad T14) -> MEMILIKI 3 UNIT FISIK DENGAN SN BERBEDA
+
+  // --- UNIT 1 (ThinkPad T14 - Unit BARU Segel Box) ---
+  const j1 = await prisma.journalEntry.create({
+    data: {
+      keterangan: `Restock Unit Fisik ${modelThinkpad.name} (SN: SN-THINKPAD-T14-001)`,
+      sourceType: 'RESTOCK',
+      status: 'POSTED',
+      total: 6800000,
       lines: {
         create: [
-          { accountCode: '520', side: 'DEBIT', nominal: 300000 },
-          { accountCode: '110', side: 'KREDIT', nominal: 300000 },
+          { accountCode: '130', side: 'DEBIT', nominal: 6800000 },
+          { accountCode: '110', side: 'KREDIT', nominal: 6800000 },
         ],
       },
     },
   });
 
-  console.log(`✅ Data User, COA, dan Jurnal Double-Entry berhasil ditanam!`);
+  await prisma.productUnit.create({
+    data: {
+      serialNumber: 'SN-THINKPAD-T14-001',
+      productModelId: modelThinkpad.id, // Relasi ke Katalog Induk ThinkPad
+      condition: 'NEW',
+      grade: null,
+      hpp: 6800000,
+      price: 8500000,
+      status: 'AVAILABLE',
+      isFisikNormal: true,
+      isMesinNormal: true,
+      isStorageNormal: true,
+      isSuhuNormal: true,
+      isKeyboardNormal: true,
+      isTouchpadNormal: true,
+      isPortNormal: true,
+      isWebcamNormal: true,
+      catatanFisik: null,
+      purchaseJournalId: j1.id,
+    },
+  });
+
+  // --- UNIT 2 (ThinkPad T14 - Unit SECOND Grade B) ---
+  const j2 = await prisma.journalEntry.create({
+    data: {
+      keterangan: `Restock Unit Fisik ${modelThinkpad.name} (SN: SN-THINKPAD-T14-002)`,
+      sourceType: 'RESTOCK',
+      status: 'POSTED',
+      total: 6200000,
+      lines: {
+        create: [
+          { accountCode: '130', side: 'DEBIT', nominal: 6200000 },
+          { accountCode: '110', side: 'KREDIT', nominal: 6200000 },
+        ],
+      },
+    },
+  });
+
+  await prisma.productUnit.create({
+    data: {
+      serialNumber: 'SN-THINKPAD-T14-002',
+      productModelId: modelThinkpad.id, // Relasi ke Katalog Induk ThinkPad yang SAMA
+      condition: 'SECOND',
+      grade: 'B',
+      hpp: 6200000,
+      price: 7900000,
+      status: 'AVAILABLE',
+      isFisikNormal: true,
+      isMesinNormal: true,
+      isStorageNormal: true,
+      isSuhuNormal: true,
+      isKeyboardNormal: true,
+      isTouchpadNormal: true,
+      isPortNormal: true,
+      isWebcamNormal: true,
+      catatanFisik: 'Baret tipis halus di top cover.',
+      purchaseJournalId: j2.id,
+    },
+  });
+
+  // --- UNIT 3 (ThinkPad T14 - Unit SECOND Grade C - QC Pending) ---
+  const j3 = await prisma.journalEntry.create({
+    data: {
+      keterangan: `Restock Unit Fisik ${modelThinkpad.name} (SN: SN-THINKPAD-T14-003)`,
+      sourceType: 'RESTOCK',
+      status: 'DRAFT',
+      total: 5800000,
+      lines: {
+        create: [
+          { accountCode: '130', side: 'DEBIT', nominal: 5800000 },
+          { accountCode: '110', side: 'KREDIT', nominal: 5800000 },
+        ],
+      },
+    },
+  });
+
+  await prisma.productUnit.create({
+    data: {
+      serialNumber: 'SN-THINKPAD-T14-003',
+      productModelId: modelThinkpad.id, // Relasi ke Katalog Induk ThinkPad yang SAMA
+      condition: 'SECOND',
+      grade: 'C',
+      hpp: 5800000,
+      price: 7500000,
+      status: 'QC_PENDING',
+      isFisikNormal: true,
+      isMesinNormal: true,
+      isStorageNormal: true,
+      isSuhuNormal: true,
+      isKeyboardNormal: false,
+      isTouchpadNormal: true,
+      isPortNormal: true,
+      isWebcamNormal: true,
+      catatanFisik: 'Keyboard ada 2 tombol huruf mati, butuh perbaikan.',
+      purchaseJournalId: j3.id,
+    },
+  });
+
+  // --- UNIT MACBOOK AIR M1 ---
+  const j4 = await prisma.journalEntry.create({
+    data: {
+      keterangan: `Restock Unit Fisik ${modelMacbook.name} (SN: SN-MACBOOK-AIR-002)`,
+      sourceType: 'RESTOCK',
+      status: 'DRAFT',
+      total: 7000000,
+      lines: {
+        create: [
+          { accountCode: '130', side: 'DEBIT', nominal: 7000000 },
+          { accountCode: '110', side: 'KREDIT', nominal: 7000000 },
+        ],
+      },
+    },
+  });
+
+  await prisma.productUnit.create({
+    data: {
+      serialNumber: 'SN-MACBOOK-AIR-002',
+      productModelId: modelMacbook.id,
+      condition: 'SECOND',
+      grade: 'C',
+      hpp: 7000000,
+      price: 9200000,
+      status: 'QC_PENDING',
+      isFisikNormal: false,
+      isMesinNormal: true,
+      isStorageNormal: true,
+      isSuhuNormal: true,
+      isKeyboardNormal: false,
+      isTouchpadNormal: true,
+      isPortNormal: true,
+      isWebcamNormal: true,
+      catatanFisik: 'Dent di sudut kiri bawah.',
+      purchaseJournalId: j4.id,
+    },
+  });
+
+  // --- UNIT ASUS ROG ---
+  const j5 = await prisma.journalEntry.create({
+    data: {
+      keterangan: `Restock Unit Fisik ${modelAsusRog.name} (SN: SN-ASUS-ROG-003)`,
+      sourceType: 'RESTOCK',
+      status: 'POSTED',
+      total: 9500000,
+      lines: {
+        create: [
+          { accountCode: '130', side: 'DEBIT', nominal: 9500000 },
+          { accountCode: '110', side: 'KREDIT', nominal: 9500000 },
+        ],
+      },
+    },
+  });
+
+  await prisma.productUnit.create({
+    data: {
+      serialNumber: 'SN-ASUS-ROG-003',
+      productModelId: modelAsusRog.id,
+      condition: 'SECOND',
+      grade: 'B',
+      hpp: 9500000,
+      price: 12500000,
+      status: 'IN_REPAIR',
+      isFisikNormal: true,
+      isMesinNormal: true,
+      isStorageNormal: true,
+      isSuhuNormal: false,
+      isKeyboardNormal: true,
+      isTouchpadNormal: true,
+      isPortNormal: true,
+      isWebcamNormal: true,
+      catatanFisik: 'Suhu agak hangat under heavy load. Perlu repaste.',
+      purchaseJournalId: j5.id,
+    },
+  });
+
+  console.log('✅ Data Seed Berhasil: 1 Katalog Induk ThinkPad T14 kini memiliki 3 Unit Fisik (SN-001, SN-002, SN-003)!');
 }
 
 main()
   .catch((e) => {
-    console.error('Gagal menanam data:', e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {

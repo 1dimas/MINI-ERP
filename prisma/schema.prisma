@@ -34,13 +34,14 @@ model JournalEntry {
   id          String        @id @default(uuid())
   tanggal     DateTime      @default(now())
   keterangan  String
-  sourceType  String        // "POS", "SERVICE", "CASHFLOW", "MANUAL"
+  sourceType  String        // "POS", "SERVICE", "CASHFLOW", "MANUAL", "PURCHASE_UNIT", "RESTOCK"
   sourceId    String?       
   status      String        @default("POSTED") // "DRAFT", "POSTED"
   total       Decimal       @db.Decimal(15, 2)
   isEdited    Boolean       @default(false)
   
   lines       JournalLine[]
+  productUnit ProductUnit?
 }
 
 model JournalLine {
@@ -50,25 +51,63 @@ model JournalLine {
   side         String         // "DEBIT", "KREDIT"
   nominal      Decimal        @db.Decimal(15, 2)
   
-  entry        JournalEntry   @relation(fields: [entryId], references: [id])
+  entry        JournalEntry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
   account      ChartOfAccount @relation(fields: [accountCode], references: [code])
 }
 
-// --- MODUL KASIR & INVENTARIS MVP ---
-model Product {
-  id          String    @id @default(uuid())
-  sku         String    @unique 
-  name        String
-  hpp         Decimal   @db.Decimal(15, 2) 
-  price       Decimal   @db.Decimal(15, 2) 
-  stock       Int       @default(0)
+// --- MODUL KATALOG INDUK & ITEM FISIK (PRODUCT MODEL + UNIT & QC) ---
+model ProductModel {
+  id          String        @id @default(uuid())
+  sku         String        @unique // Contoh: L-THINK-T480
+  name        String        // Contoh: Lenovo ThinkPad T480 i5 8/256
+  category    String        // "LAPTOP", "AKSESORIS"
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  units       ProductUnit[]
+}
+
+model ProductUnit {
+  id                String       @id @default(uuid())
+  serialNumber      String       @unique // Wajib scan fisik
+  condition         String       // "NEW", "SECOND"
+  grade             String?      // "A", "B", "C" (null jika NEW)
+  hpp               Decimal      @db.Decimal(15, 2)
+  price             Decimal      @db.Decimal(15, 2)
+  status            String       @default("AVAILABLE") // "QC_PENDING", "AVAILABLE", "IN_REPAIR", "SOLD"
+
+  // --- QC CHECKLIST ---
+  isFisikNormal     Boolean      @default(true)
+  isMesinNormal     Boolean      @default(true)
+  isStorageNormal   Boolean      @default(true)
+  isSuhuNormal      Boolean      @default(true)
+  isKeyboardNormal  Boolean      @default(true)
+  isTouchpadNormal  Boolean      @default(true)
+  isPortNormal      Boolean      @default(true)
+  isWebcamNormal    Boolean      @default(true)
+  catatanFisik      String?      @db.Text 
+
+  // --- RELASI KE KATALOG INDUK ---
+  productModelId    String
+  productModel      ProductModel @relation(fields: [productModelId], references: [id], onDelete: Cascade)
+
+  // Maker-Checker & Journal Relation
+  purchaseJournalId String?       @unique
+  purchaseJournal   JournalEntry? @relation(fields: [purchaseJournalId], references: [id], onDelete: SetNull)
+
+  transactions      PosTransaction[]
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 }
 
 model PosTransaction {
-  id          String    @id @default(uuid())
-  tanggal     DateTime  @default(now())
-  productId   String
-  qty         Int
-  totalPrice  Decimal   @db.Decimal(15, 2)
-  totalHpp    Decimal   @db.Decimal(15, 2) 
+  id            String       @id @default(uuid())
+  tanggal       DateTime     @default(now())
+  serialNumber  String
+  productUnitId String?
+  productUnit   ProductUnit? @relation(fields: [productUnitId], references: [id])
+  totalPrice    Decimal      @db.Decimal(15, 2)
+  totalHpp      Decimal      @db.Decimal(15, 2) 
+  cashierName   String?
 }

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { CashflowService } from '@/src/cashflow/cashflow.service';
 
-const prisma = new PrismaClient();
 const cashflowService = new CashflowService(prisma as any);
 
 export async function PATCH(

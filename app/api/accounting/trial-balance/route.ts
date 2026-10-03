@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { AccountingService } from '@/src/accounting/accounting.service';
 
-const prisma = new PrismaClient();
 const accountingService = new AccountingService(prisma as any);
 
 export async function GET(req: Request) {

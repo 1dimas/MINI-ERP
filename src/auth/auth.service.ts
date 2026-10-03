@@ -114,7 +114,7 @@ export class AuthService {
     const appName = 'MyToko POS';
     const otpauthUrl = generateURI({
       secret,
-      accountName: user.email,
+      label: user.email,
       issuer: appName,
     });
     const qrCodeUrl = await QRCode.toDataURL(otpauthUrl);

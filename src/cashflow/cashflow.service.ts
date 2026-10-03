@@ -47,7 +47,8 @@ export class CashflowService {
   }
 
   /**
-   * POST /cashflow: Input Transaksi Arus Kas (Langsung POSTED, tanpa audit)
+   * POST /cashflow: Input Transaksi Arus Kas
+   * ALUR UTAMA: Otomatis masuk sebagai DRAFT di Jurnal Umum terlebih dahulu
    */
   async create(dto: CreateCashflowDto, user: { id: string; role: string }) {
     if (user.role === Role.KASIR) {
@@ -93,7 +94,7 @@ export class CashflowService {
       }
     }
 
-    // Transaksi Cashflow LANGSUNG POSTED (Tanpa audit)
+    // Konstruksi Double-Entry Logic
     let debitAccountCode = '';
     let kreditAccountCode = '';
 
@@ -108,12 +109,13 @@ export class CashflowService {
       kreditAccountCode = dto.sourceAccountCode;
     }
 
+    // ALUR KRUSIAL: Semua transaksi Cashflow masuk ke DB sebagai DRAFT terlebih dahulu!
     return this.prisma.journalEntry.create({
       data: {
         tanggal: transDate,
         keterangan: dto.keterangan,
         sourceType: dto.type,
-        status: 'POSTED', // Cashflow langsung POSTED
+        status: 'DRAFT', // Otomatis masuk ke Draf Jurnal Umum!
         total: dto.nominal,
         lines: {
           create: [
@@ -130,5 +132,35 @@ export class CashflowService {
         },
       },
     });
+  }
+
+  async findPending() {
+    return this.prisma.journalEntry.findMany({
+      where: { status: 'DRAFT' },
+      include: { lines: { include: { account: true } } },
+      orderBy: { tanggal: 'desc' },
+    });
+  }
+
+  async approve(id: string, user: { role: string } = { role: 'OWNER' }) {
+    if (user.role !== Role.OWNER) {
+      throw new ForbiddenException('Hanya OWNER yang berhak menyetujui transaksi.');
+    }
+    const entry = await this.prisma.journalEntry.findUnique({ where: { id } });
+    if (!entry) throw new NotFoundException('Transaksi tidak ditemukan.');
+    return this.prisma.journalEntry.update({
+      where: { id },
+      data: { status: 'POSTED' },
+    });
+  }
+
+  async reject(id: string, user: { role: string } = { role: 'OWNER' }) {
+    if (user.role !== Role.OWNER) {
+      throw new ForbiddenException('Hanya OWNER yang berhak menolak transaksi.');
+    }
+    const entry = await this.prisma.journalEntry.findUnique({ where: { id } });
+    if (!entry) throw new NotFoundException('Transaksi tidak ditemukan.');
+    await this.prisma.journalLine.deleteMany({ where: { entryId: id } });
+    return this.prisma.journalEntry.delete({ where: { id } });
   }
 }

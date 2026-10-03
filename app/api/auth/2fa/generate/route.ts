@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { generateSecret, generateURI } from 'otplib';
 import QRCode from 'qrcode';
-
-const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
@@ -36,7 +34,7 @@ export async function POST(req: Request) {
 
     const otpauthUrl = generateURI({
       secret,
-      accountName: user.email,
+      label: user.email,
       issuer: 'MyToko POS',
     });
     const qrCodeUrl = await QRCode.toDataURL(otpauthUrl);
