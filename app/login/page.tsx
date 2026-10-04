@@ -268,6 +268,45 @@ function LoginFormContent() {
                     'Masuk'
                   )}
                 </Button>
+
+                {/* QUICK LOGIN PRESETS */}
+                <div className="pt-3 border-t border-neutral-800/80 space-y-2">
+                  <p className="text-[10px] font-mono text-neutral-400 text-center uppercase tracking-wider">
+                    Masuk Cepat Sebagai Akun:
+                  </p>
+                  <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('kasir@solitpos.com');
+                        setPassword('Kasir123!');
+                      }}
+                      className="p-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-emerald-400 font-semibold transition cursor-pointer text-center"
+                    >
+                      Budi Kasir
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('finance@solitpos.com');
+                        setPassword('Finance123!');
+                      }}
+                      className="p-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-blue-400 font-semibold transition cursor-pointer text-center"
+                    >
+                      Siti Finance
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('dimas@solitpos.com');
+                        setPassword('AdminSolit2026!');
+                      }}
+                      className="p-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-amber-400 font-semibold transition cursor-pointer text-center"
+                    >
+                      Dimas Owner
+                    </button>
+                  </div>
+                </div>
               </form>
             ) : (
               /* STEP 2: Komponen InputOTP Shadcn (6 Digit) */

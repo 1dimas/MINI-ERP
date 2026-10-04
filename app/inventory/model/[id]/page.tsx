@@ -409,27 +409,6 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
             Daftar Khusus Unit Fisik (Serial Number Specific) di bawah katalog model ini.
           </p>
         </div>
-
-        {/* ROLE SWITCHER DEMO TOOLBAR */}
-        <div className="flex items-center gap-2 bg-neutral-900/80 p-2 border border-neutral-800 rounded-xl">
-          <span className="text-[11px] font-mono text-neutral-400 pl-2">Mode Simulasi:</span>
-          {(['OWNER', 'FINANCE', 'KASIR'] as const).map((r) => (
-            <button
-              key={r}
-              onClick={() => {
-                setRole(r);
-                setUserName(r === 'OWNER' ? 'Dimas Owner' : r === 'FINANCE' ? 'Siti Keuangan' : 'Budi Kasir');
-              }}
-              className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition ${
-                role === r
-                  ? 'bg-white text-black shadow-lg'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
-              }`}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
       </header>
 
       {/* METRIC KPI CARDS */}

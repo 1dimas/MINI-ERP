@@ -66,11 +66,38 @@ export class AccountingService {
       },
     });
 
-    let runningBalance = 0;
+    let startingBalance = 0;
+    if (filterDto.startDate) {
+      const priorLines = await this.prisma.journalLine.findMany({
+        where: {
+          accountCode,
+          entry: {
+            status: 'POSTED',
+            tanggal: { lt: new Date(filterDto.startDate) },
+          },
+        },
+      });
+      for (const line of priorLines) {
+        const nominal = Number(line.nominal);
+        if (account.normalBalance === 'DEBIT') {
+          startingBalance += line.side === 'DEBIT' ? nominal : -nominal;
+        } else {
+          startingBalance += line.side === 'KREDIT' ? nominal : -nominal;
+        }
+      }
+    }
+
+    let runningBalance = startingBalance;
+    let totalDebit = 0;
+    let totalKredit = 0;
+
     const formattedTransactions = lines.map((line) => {
       const nominal = Number(line.nominal);
       const isDebit = line.side === 'DEBIT';
       const isCredit = line.side === 'KREDIT';
+
+      if (isDebit) totalDebit += nominal;
+      if (isCredit) totalKredit += nominal;
 
       // Logic Running Balance sesuai normalBalance
       if (account.normalBalance === 'DEBIT') {
@@ -101,6 +128,9 @@ export class AccountingService {
         type: account.type,
         normalBalance: account.normalBalance,
       },
+      startingBalance: Number(startingBalance.toFixed(2)),
+      totalDebit: Number(totalDebit.toFixed(2)),
+      totalKredit: Number(totalKredit.toFixed(2)),
       endingBalance: Number(runningBalance.toFixed(2)),
       totalTransactions: formattedTransactions.length,
       transactions: formattedTransactions,
@@ -110,6 +140,7 @@ export class AccountingService {
   /**
    * 2. GET /accounting/trial-balance (Neraca Saldo)
    * UPDATE KRUSIAL: HANYA menghitung dari jurnal yang berstatus 'POSTED'
+   * Mendukung saldo awal (carry-forward) untuk akun Aset, Kewajiban, Ekuitas
    */
   async getTrialBalance(filterDto: DateFilterDto) {
     const dateFilter = this.buildDateFilter(
@@ -121,7 +152,29 @@ export class AccountingService {
       orderBy: { code: 'asc' },
     });
 
-    // Efficient aggregate query per account - HANYA STATUS POSTED
+    // Agregasi saldo awal sebelum startDate untuk akun Neraca (ASET, KEWAJIBAN, EKUITAS)
+    const priorSumsMap = new Map<string, { debit: number; kredit: number }>();
+    if (filterDto.startDate) {
+      const priorLines = await this.prisma.journalLine.groupBy({
+        by: ['accountCode', 'side'],
+        _sum: { nominal: true },
+        where: {
+          entry: {
+            status: 'POSTED',
+            tanggal: { lt: new Date(filterDto.startDate) },
+          },
+        },
+      });
+      for (const item of priorLines) {
+        const cur = priorSumsMap.get(item.accountCode) || { debit: 0, kredit: 0 };
+        const amt = Number(item._sum.nominal || 0);
+        if (item.side === 'DEBIT') cur.debit += amt;
+        else if (item.side === 'KREDIT') cur.kredit += amt;
+        priorSumsMap.set(item.accountCode, cur);
+      }
+    }
+
+    // Efficient aggregate query per account periode ini - HANYA STATUS POSTED
     const journalLines = await this.prisma.journalLine.groupBy({
       by: ['accountCode', 'side'],
       _sum: {
@@ -129,7 +182,7 @@ export class AccountingService {
       },
       where: {
         entry: {
-          status: 'POSTED', // UPDATE KRUSIAL: Abaikan DRAFT
+          status: 'POSTED',
           ...(dateFilter ? { tanggal: dateFilter } : {}),
         },
       },
@@ -158,11 +211,23 @@ export class AccountingService {
       totalDebitAll += debit;
       totalKreditAll += kredit;
 
-      let endingBalance = 0;
+      // Hitung Saldo Awal untuk akun Neraca
+      let startingBalance = 0;
+      const isBalanceSheetAccount = ['ASET', 'KEWAJIBAN', 'EKUITAS'].includes(account.type);
+      if (isBalanceSheetAccount && filterDto.startDate) {
+        const prior = priorSumsMap.get(account.code) || { debit: 0, kredit: 0 };
+        if (account.normalBalance === 'DEBIT') {
+          startingBalance = prior.debit - prior.kredit;
+        } else {
+          startingBalance = prior.kredit - prior.debit;
+        }
+      }
+
+      let endingBalance = startingBalance;
       if (account.normalBalance === 'DEBIT') {
-        endingBalance = debit - kredit;
+        endingBalance += debit - kredit;
       } else {
-        endingBalance = kredit - debit;
+        endingBalance += kredit - debit;
       }
 
       return {
@@ -170,6 +235,7 @@ export class AccountingService {
         name: account.name,
         type: account.type,
         normalBalance: account.normalBalance,
+        startingBalance: Number(startingBalance.toFixed(2)),
         debit,
         kredit,
         endingBalance: Number(endingBalance.toFixed(2)),
