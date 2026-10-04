@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'otplib';
+import { signJwt } from '@/lib/auth-token';
 
 export async function POST(req: Request) {
   try {
@@ -50,13 +51,37 @@ export async function POST(req: Request) {
       });
     }
 
-    const { password: _, twoFactorSecret: __, ...userClean } = user;
-    const mockAccessToken = `jwt-token-final-2fa-${user.id}-${Date.now()}`;
+    // Terbitkan JWT token valid (1 hari)
+    const token = await signJwt({
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    });
 
-    return NextResponse.json({
-      accessToken: mockAccessToken,
+    const { password: _, twoFactorSecret: __, ...userClean } = user;
+
+    const response = NextResponse.json({
+      accessToken: token,
+      access_token: token,
       user: userClean,
     });
+
+    // Simpan ke cookies via Next.js response cookies
+    response.cookies.set('access_token', token, {
+      httpOnly: false,
+      path: '/',
+      maxAge: 60 * 60 * 24,
+      sameSite: 'lax',
+    });
+    response.cookies.set('token', token, {
+      httpOnly: false,
+      path: '/',
+      maxAge: 60 * 60 * 24,
+      sameSite: 'lax',
+    });
+
+    return response;
   } catch (error: any) {
     return NextResponse.json(
       { message: error.message || 'Terjadi kesalahan server' },
