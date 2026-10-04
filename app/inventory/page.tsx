@@ -24,6 +24,7 @@ import {
   X,
   Layers,
   Folder,
+  Printer,
 } from 'lucide-react';
 
 export default function InventoryPage() {
@@ -394,9 +395,9 @@ export default function InventoryPage() {
     .reduce((acc, u) => acc + Number(u.hpp), 0);
 
   return (
-    <div className="flex min-h-screen bg-black text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
       <Sidebar />
-      <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-8 overflow-y-auto">
+      <div className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 space-y-8 overflow-y-auto">
         {/* NOTIFICATION FEEDBACK TOAST */}
       {apiFeedback && (
         <div
@@ -514,30 +515,77 @@ export default function InventoryPage() {
               Nilai Aset Persediaan
               <DollarSign className="w-4 h-4 text-white" />
             </CardDescription>
-            <CardTitle className="text-lg font-mono text-white truncate">{formatRupiah(totalHppAssets)}</CardTitle>
+            <CardTitle className="text-lg font-mono text-white truncate">
+              {role === 'KASIR' ? 'Rp *** (Khusus Finance/Owner)' : formatRupiah(totalHppAssets)}
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <p className="text-[11px] text-neutral-500">COA 130 Persediaan Barang</p>
+            <p className="text-[11px] text-neutral-500">
+              {role === 'KASIR' ? 'Akses modal dirahasiakan untuk Kasir' : 'COA 130 Persediaan Barang'}
+            </p>
           </CardContent>
         </Card>
       </section>
 
-      {/* POS TERMINAL CHECKOUT SIMULATION SECTION (KASIR & DEMO) */}
-      <section className="p-5 border border-neutral-800 bg-neutral-950 rounded-xl space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-neutral-800 pb-3">
-          <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
+      {/* POS TERMINAL CHECKOUT SECTION (RBAC ADAPTIVE) */}
+      {role === 'FINANCE' ? (
+        <section className="p-4 border border-neutral-800 bg-neutral-950 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
               <ShoppingCart className="w-5 h-5 text-emerald-400" />
-              Terminal Penjualan Kasir (POS Checkout & Gatekeeper Validation)
-            </h2>
-            <p className="text-xs text-neutral-400">
-              Sistem memvalidasi status SN secara ketat & menarik HPP mutlak dari unit fisik yang di-scan.
-            </p>
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                Akses Kasir POS Ditiadakan untuk Role Finance
+              </h2>
+              <p className="text-xs text-neutral-400">
+                Finance mengelola data barang & akuntansi. Seluruh transaksi kasir di meja POS otomatis mengalir ke Arus Kas (Cashflow) & Jurnal Umum.
+              </p>
+            </div>
           </div>
-          <Badge variant="outline" className="border-emerald-500 text-emerald-400 font-mono text-xs">
-            STRICT MARGIN AUTO-JOURNAL
-          </Badge>
-        </div>
+          <Link href="/finance">
+            <Button variant="outline" className="border-neutral-700 hover:bg-neutral-900 text-white text-xs font-semibold">
+              Lihat Arus Kas & Jurnal &rarr;
+            </Button>
+          </Link>
+        </section>
+      ) : role === 'KASIR' ? (
+        <section className="p-4 border border-emerald-900/40 bg-emerald-950/20 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <ShoppingCart className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                Mode Katalog & Stok Kasir (Read-Only)
+              </h2>
+              <p className="text-xs text-neutral-400">
+                Kasir hanya melihat ketersediaan stok & harga jual tanpa izin edit/HPP. Pembayaran dan scan nota dilakukan di Terminal Kasir POS.
+              </p>
+            </div>
+          </div>
+          <Link href="/pos">
+            <Button className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold shadow-lg">
+              <ShoppingCart className="w-4 h-4 mr-1.5" /> Buka Terminal Kasir (POS)
+            </Button>
+          </Link>
+        </section>
+      ) : (
+        <section className="p-5 border border-neutral-800 bg-neutral-950 rounded-xl space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-neutral-800 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-emerald-400" />
+                Terminal Penjualan Kasir (POS Checkout & Gatekeeper Validation)
+              </h2>
+              <p className="text-xs text-neutral-400">
+                Sistem memvalidasi status SN secara ketat & menarik HPP mutlak dari unit fisik yang di-scan.
+              </p>
+            </div>
+            <Badge variant="outline" className="border-emerald-500 text-emerald-400 font-mono text-xs">
+              STRICT MARGIN AUTO-JOURNAL
+            </Badge>
+          </div>
 
         <form onSubmit={handlePosCheckout} className="flex flex-col md:flex-row gap-3 items-end">
           <div className="flex-1 space-y-1.5 w-full">
@@ -607,6 +655,7 @@ export default function InventoryPage() {
           </div>
         )}
       </section>
+      )}
 
       {/* VIEW MODE TOGGLE & MAIN TABLE */}
       <main className="space-y-4">
@@ -782,7 +831,7 @@ export default function InventoryPage() {
                     <th className="p-3.5">Serial Number</th>
                     <th className="p-3.5">Nama Unit / Model</th>
                     <th className="p-3.5">Kondisi & Grade</th>
-                    <th className="p-3.5">HPP Beli</th>
+                    {role !== 'KASIR' && <th className="p-3.5">HPP Beli</th>}
                     <th className="p-3.5">Harga Jual</th>
                     <th className="p-3.5">Hasil QC Checklist</th>
                     <th className="p-3.5">Status Unit</th>
@@ -792,13 +841,13 @@ export default function InventoryPage() {
                 <tbody className="divide-y divide-neutral-900 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-neutral-500 font-mono">
+                      <td colSpan={role !== 'KASIR' ? 8 : 7} className="p-8 text-center text-neutral-500 font-mono">
                         Memuat daftar unit inventaris...
                       </td>
                     </tr>
                   ) : filteredUnits.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-neutral-500 font-mono">
+                      <td colSpan={role !== 'KASIR' ? 8 : 7} className="p-8 text-center text-neutral-500 font-mono">
                         Tidak ada data unit laptop yang cocok dengan filter.
                       </td>
                     </tr>
@@ -858,11 +907,13 @@ export default function InventoryPage() {
                             </div>
                           </td>
 
-                          <td className="p-3.5 font-mono">
-                            <div className="text-white font-semibold text-xs">
-                              {formatRupiah(Number(unit.hpp))}
-                            </div>
-                          </td>
+                          {role !== 'KASIR' && (
+                            <td className="p-3.5 font-mono">
+                              <div className="text-white font-semibold text-xs">
+                                {formatRupiah(Number(unit.hpp))}
+                              </div>
+                            </td>
+                          )}
 
                           <td className="p-3.5 font-mono">
                             <div className="text-emerald-400 font-semibold text-xs">
@@ -947,7 +998,7 @@ export default function InventoryPage() {
                                 </>
                               )}
 
-                              {(unit.status === 'IN_REPAIR' || (unit.status === 'AVAILABLE' && unit.grade !== 'A')) && (
+                              {role !== 'KASIR' && (unit.status === 'IN_REPAIR' || (unit.status === 'AVAILABLE' && unit.grade !== 'A')) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -968,6 +1019,17 @@ export default function InventoryPage() {
                                   Scan di POS
                                 </Button>
                               )}
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open('/print/barcode/' + encodeURIComponent(unit.serialNumber), '_blank')}
+                                title="Cetak Stiker Barcode Thermal (50x30mm)"
+                                className="h-7 border-neutral-700 bg-neutral-900 text-neutral-300 hover:text-white hover:bg-neutral-800 text-[10px] px-2 flex items-center gap-1 cursor-pointer"
+                              >
+                                <Printer className="w-3 h-3 text-neutral-300" />
+                                <span>Print Barcode</span>
+                              </Button>
                             </div>
                           </td>
                         </tr>

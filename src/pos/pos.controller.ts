@@ -63,4 +63,19 @@ export class PosController {
   async getTransactionById(@Param('id') id: string) {
     return this.posService.getTransactionById(id);
   }
+
+  /**
+   * POST /pos/void/:invoiceNumber
+   * Otorisasi ketat OWNER: Membatalkan transaksi (VOID), mengembalikan stok ke AVAILABLE,
+   * dan mencatat Jurnal Pembalik (Reversal) otomatis.
+   * Akses: HANYA OWNER
+   */
+  @Post('void/:invoiceNumber')
+  @Roles(Role.OWNER)
+  async voidTransaction(
+    @Param('invoiceNumber') invoiceNumber: string,
+    @GetUser() user: { id: string; name?: string; email?: string; role: string },
+  ) {
+    return this.posService.voidTransaction(invoiceNumber, user);
+  }
 }

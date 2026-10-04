@@ -233,10 +233,10 @@ export default function FinanceDashboardPage() {
   const pendingJournals = journalList.filter((j) => j.status === 'DRAFT');
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col md:flex-row font-sans">
+    <div className="min-h-screen md:h-screen bg-black text-white flex flex-col md:flex-row font-sans md:overflow-hidden">
       {/* SIDEBAR NAVIGATION (STRICT B&W) */}
-      <aside className="w-full md:w-64 border-r border-neutral-800 bg-neutral-950 p-5 flex flex-col justify-between shrink-0">
-        <div className="space-y-6">
+      <aside className="w-full md:w-64 border-r border-neutral-800 bg-neutral-950 flex flex-col justify-between shrink-0 md:h-screen md:sticky md:top-0 z-30 select-none">
+        <div className="p-5 space-y-6 flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#262626_transparent]">
           <div className="pb-4 border-b border-neutral-800">
             <h2 className="text-lg font-bold tracking-tight">Finance Portal</h2>
             <p className="text-xs text-neutral-400">Modul Keuangan & Akuntansi</p>
@@ -245,7 +245,7 @@ export default function FinanceDashboardPage() {
           <nav className="space-y-1">
             <button
               onClick={() => setActiveMenu('overview')}
-              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium ${
+              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium cursor-pointer transition ${
                 activeMenu === 'overview'
                   ? 'bg-white text-black font-bold'
                   : 'text-neutral-300 hover:bg-neutral-900 hover:text-white'
@@ -257,7 +257,7 @@ export default function FinanceDashboardPage() {
 
             <button
               onClick={() => setActiveMenu('cashflow')}
-              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium ${
+              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium cursor-pointer transition ${
                 activeMenu === 'cashflow'
                   ? 'bg-white text-black font-bold'
                   : 'text-neutral-300 hover:bg-neutral-900 hover:text-white'
@@ -269,7 +269,7 @@ export default function FinanceDashboardPage() {
 
             <button
               onClick={() => setActiveMenu('journal')}
-              className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded font-medium ${
+              className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded font-medium cursor-pointer transition ${
                 activeMenu === 'journal'
                   ? 'bg-white text-black font-bold'
                   : 'text-neutral-300 hover:bg-neutral-900 hover:text-white'
@@ -288,7 +288,7 @@ export default function FinanceDashboardPage() {
 
             <button
               onClick={() => setActiveMenu('tb')}
-              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium ${
+              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium cursor-pointer transition ${
                 activeMenu === 'tb'
                   ? 'bg-white text-black font-bold'
                   : 'text-neutral-300 hover:bg-neutral-900 hover:text-white'
@@ -300,7 +300,7 @@ export default function FinanceDashboardPage() {
 
             <button
               onClick={() => setActiveMenu('pl')}
-              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium ${
+              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium cursor-pointer transition ${
                 activeMenu === 'pl'
                   ? 'bg-white text-black font-bold'
                   : 'text-neutral-300 hover:bg-neutral-900 hover:text-white'
@@ -312,7 +312,7 @@ export default function FinanceDashboardPage() {
 
             <button
               onClick={() => setActiveMenu('ledger')}
-              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium ${
+              className={`w-full flex items-center px-3 py-2 text-sm rounded font-medium cursor-pointer transition ${
                 activeMenu === 'ledger'
                   ? 'bg-white text-black font-bold'
                   : 'text-neutral-300 hover:bg-neutral-900 hover:text-white'
@@ -324,9 +324,9 @@ export default function FinanceDashboardPage() {
           </nav>
         </div>
 
-        <div className="pt-4 border-t border-neutral-800">
+        <div className="p-5 border-t border-neutral-800 shrink-0 bg-neutral-950">
           <Link href="/dashboard" className="block w-full">
-            <Button variant="outline" size="sm" className="w-full flex items-center justify-center gap-2">
+            <Button variant="outline" size="sm" className="w-full flex items-center justify-center gap-2 cursor-pointer">
               <ArrowLeft className="w-4 h-4" />
               Ke Dashboard Utama
             </Button>
@@ -335,7 +335,7 @@ export default function FinanceDashboardPage() {
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 p-6 space-y-6 overflow-y-auto">
+      <main className="flex-1 min-w-0 p-6 space-y-6 overflow-y-auto">
         {/* Top Filter Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border border-neutral-800 bg-neutral-950 rounded-lg">
           <div className="flex flex-wrap items-center gap-3">

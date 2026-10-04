@@ -48,39 +48,108 @@ export default function Sidebar() {
     window.location.reload();
   };
 
-  const navItems = [
-    {
-      title: 'Dashboard Utama',
-      href: '/dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      title: 'Inventaris & QC Unit',
-      href: '/inventory',
-      icon: Laptop,
-      badge: 'PROD',
-    },
-    {
-      title: 'Jurnal & Arus Kas',
-      href: '/finance',
-      icon: ArrowLeftRight,
-    },
-    {
-      title: 'Laporan & Neraca',
-      href: '/finance',
-      icon: Scale,
-    },
-    {
-      title: 'Keamanan 2FA',
-      href: '/2fa-setup',
-      icon: ShieldCheck,
-    },
-  ];
+  // Saring menu sidebar berdasarkan Role pengguna (RBAC)
+  const getNavItems = () => {
+    const currentRole = user?.role || 'KASIR';
+
+    // 1. Role KASIR: Hanya melihat Terminal Kasir & Katalog Stok (Read-Only)
+    if (currentRole === 'KASIR') {
+      return [
+        {
+          title: 'Terminal Kasir (POS)',
+          href: '/pos',
+          icon: Store,
+          badge: 'UTAMA',
+        },
+        {
+          title: 'Katalog & Stok Barang',
+          href: '/inventory',
+          icon: Laptop,
+          badge: 'LIHAT',
+        },
+        {
+          title: 'Keamanan 2FA',
+          href: '/2fa-setup',
+          icon: ShieldCheck,
+        },
+      ];
+    }
+
+    // 2. Role FINANCE: Kelola barang (CRUD) & Akuntansi/Arus Kas (TIDAK ADA KASIR)
+    if (currentRole === 'FINANCE') {
+      return [
+        {
+          title: 'Dashboard Utama',
+          href: '/dashboard',
+          icon: LayoutDashboard,
+        },
+        {
+          title: 'Inventaris & Data Barang',
+          href: '/inventory',
+          icon: Laptop,
+          badge: 'CRUD',
+        },
+        {
+          title: 'Jurnal & Arus Kas',
+          href: '/finance',
+          icon: ArrowLeftRight,
+        },
+        {
+          title: 'Laporan & Neraca',
+          href: '/finance',
+          icon: Scale,
+        },
+        {
+          title: 'Keamanan 2FA',
+          href: '/2fa-setup',
+          icon: ShieldCheck,
+        },
+      ];
+    }
+
+    // 3. Role OWNER: Super Admin (Bisa lihat dan akses SEMUA)
+    return [
+      {
+        title: 'Dashboard Utama',
+        href: '/dashboard',
+        icon: LayoutDashboard,
+      },
+      {
+        title: 'Terminal Kasir (POS)',
+        href: '/pos',
+        icon: Store,
+        badge: 'POS',
+      },
+      {
+        title: 'Inventaris & QC Unit',
+        href: '/inventory',
+        icon: Laptop,
+        badge: 'ALL',
+      },
+      {
+        title: 'Jurnal & Arus Kas',
+        href: '/finance',
+        icon: ArrowLeftRight,
+      },
+      {
+        title: 'Laporan & Neraca',
+        href: '/finance',
+        icon: Scale,
+      },
+      {
+        title: 'Keamanan 2FA',
+        href: '/2fa-setup',
+        icon: ShieldCheck,
+      },
+    ];
+  };
+
+  const navItems = getNavItems();
 
   return (
-    <aside className="w-64 bg-neutral-950 border-r border-neutral-800 flex flex-col justify-between shrink-0 min-h-screen text-white font-sans">
-      {/* BRAND & HEADER */}
-      <div className="p-5 space-y-6">
+    <aside className="w-64 bg-neutral-950 border-r border-neutral-800 flex flex-col justify-between shrink-0 h-screen sticky top-0 text-white font-sans z-30 select-none">
+      {/* BRAND & HEADER & NAV LINKS (SCROLLABLE AREA JIKA LAYAR PENDEK) */}
+      <div className="p-5 space-y-6 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:#262626_transparent]">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-white text-black rounded-xl font-bold flex items-center justify-center shadow-lg">
             <Store className="w-5 h-5" />
@@ -131,7 +200,7 @@ export default function Sidebar() {
               <button
                 key={r}
                 onClick={() => changeRole(r)}
-                className={`py-1 rounded font-bold transition ${
+                className={`py-1 rounded font-bold transition cursor-pointer ${
                   user?.role === r
                     ? 'bg-white text-black shadow'
                     : 'text-neutral-400 hover:text-white'
@@ -178,8 +247,8 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* FOOTER & LOGOUT BUTTON */}
-      <div className="p-4 border-t border-neutral-800 space-y-3">
+      {/* FOOTER & LOGOUT BUTTON (PINNED AT THE BOTTOM) */}
+      <div className="p-4 border-t border-neutral-800 space-y-3 shrink-0 bg-neutral-950">
         <div className="flex items-center justify-between text-[11px] text-neutral-400">
           <span className="flex items-center gap-1 font-mono">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
@@ -190,7 +259,7 @@ export default function Sidebar() {
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 border border-red-900/50 bg-red-950/20 hover:bg-red-950/60 transition"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 border border-red-900/50 bg-red-950/20 hover:bg-red-950/60 transition cursor-pointer"
         >
           <LogOut className="w-4 h-4" />
           Keluar (Logout)

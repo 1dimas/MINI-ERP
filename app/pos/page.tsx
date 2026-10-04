@@ -37,6 +37,14 @@ import {
   ShoppingBag,
   Loader2,
   Laptop,
+  Lock,
+  Unlock,
+  Coins,
+  AlertTriangle,
+  TrendingDown,
+  TrendingUp,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import Cookies from 'js-cookie';
 
@@ -61,8 +69,25 @@ export default function PosPage() {
   // Struk / Receipt Modal State
   const [completedInvoice, setCompletedInvoice] = useState<any>(null);
 
-  // User Profile State
-  const [user, setUser] = useState<{ name: string; role: string } | null>(null);
+  // Zustand Global POS & Shift Store
+  const {
+    user,
+    setUser,
+    currentShift,
+    setCurrentShift,
+    isLoadingShift,
+    isOpenShiftModal,
+    setIsOpenShiftModal,
+    isCloseShiftModal,
+    setIsCloseShiftModal,
+    settlementResult,
+    setSettlementResult,
+    fetchCurrentShift,
+  } = usePosStore();
+
+  const [startingCashInput, setStartingCashInput] = useState<number | ''>(200000);
+  const [actualEndingCashInput, setActualEndingCashInput] = useState<number | ''>('');
+  const [isSubmittingShift, setIsSubmittingShift] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -83,16 +108,19 @@ export default function PosPage() {
 
   // Initial Load: Ambil identitas user & pasang autoFocus
   useEffect(() => {
+    let activeUser: any = null;
     if (typeof window !== 'undefined') {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         try {
-          setUser(JSON.parse(storedUser));
+          activeUser = JSON.parse(storedUser);
+          setUser(activeUser);
         } catch {
           // ignore
         }
       }
     }
+    fetchCurrentShift(activeUser?.id, activeUser?.role);
     inputRef.current?.focus();
   }, []);
 
@@ -102,6 +130,102 @@ export default function PosPage() {
       inputRef.current?.focus();
       inputRef.current?.select();
     }, 50);
+  };
+
+  // Handler Buka Shift
+  const handleOpenShift = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cashVal = Number(startingCashInput);
+    if (isNaN(cashVal) || cashVal < 0) {
+      setAlert({
+        type: 'error',
+        message: 'Modal awal kasir tidak valid!',
+      });
+      return;
+    }
+
+    setIsSubmittingShift(true);
+    setAlert(null);
+
+    try {
+      const res = await fetch('/api/shift/open', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || 'demo-kasir-id',
+          'x-user-role': user?.role || 'KASIR',
+        },
+        body: JSON.stringify({ startingCash: cashVal }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Gagal membuka shift kasir');
+      }
+
+      setIsOpenShiftModal(false);
+      await fetchCurrentShift();
+      setAlert({
+        type: 'success',
+        message: `Shift kasir berhasil dibuka dengan modal awal ${formatRupiah(cashVal)}!`,
+      });
+      focusInput();
+    } catch (err: any) {
+      setAlert({
+        type: 'error',
+        message: err.message || 'Terjadi kesalahan saat membuka shift',
+      });
+    } finally {
+      setIsSubmittingShift(false);
+    }
+  };
+
+  // Handler Tutup Shift (Cash Settlement)
+  const handleCloseShift = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const actualCashVal = Number(actualEndingCashInput);
+    if (isNaN(actualCashVal) || actualCashVal < 0) {
+      setAlert({
+        type: 'error',
+        message: 'Masukkan jumlah uang fisik aktual yang valid!',
+      });
+      return;
+    }
+
+    setIsSubmittingShift(true);
+    setAlert(null);
+
+    try {
+      const res = await fetch('/api/shift/close', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || 'demo-kasir-id',
+          'x-user-role': user?.role || 'KASIR',
+        },
+        body: JSON.stringify({ actualEndingCash: actualCashVal }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Gagal menutup shift');
+      }
+
+      setIsCloseShiftModal(false);
+      setCurrentShift(null);
+      setSettlementResult(data);
+      setAlert({
+        type: 'success',
+        message: 'Shift harian berhasil ditutup & Jurnal Akuntansi telah dibukukan.',
+      });
+    } catch (err: any) {
+      setAlert({
+        type: 'error',
+        message: err.message || 'Terjadi kesalahan saat menutup shift',
+      });
+    } finally {
+      setIsSubmittingShift(false);
+    }
   };
 
   // 1. SCAN SERIAL NUMBER
@@ -163,6 +287,15 @@ export default function PosPage() {
   const handleCheckout = async () => {
     if (!isPayable) return;
 
+    if (!currentShift) {
+      setAlert({
+        type: 'error',
+        message: 'Shift kasir belum dibuka! Silakan buka shift kasir terlebih dahulu.',
+      });
+      setIsOpenShiftModal(true);
+      return;
+    }
+
     setIsCheckingOut(true);
     setAlert(null);
 
@@ -179,6 +312,7 @@ export default function PosPage() {
           'Content-Type': 'application/json',
           'x-user-role': user?.role || 'KASIR',
           'x-user-name': user?.name || 'Kasir Toko',
+          'x-user-id': user?.id || 'demo-kasir-id',
         },
         body: JSON.stringify(payload),
       });
@@ -205,9 +339,12 @@ export default function PosPage() {
       setAmountPaid('');
       setScanInput('');
 
+      // Refresh data shift untuk memperbarui expectedEndingCash
+      await fetchCurrentShift();
+
       setAlert({
         type: 'success',
-        message: 'Pembayaran berhasil! Struk siap dicetak.',
+        message: 'Pembayaran berhasil! Struk siap dicetak & saldo shift diperbarui.',
       });
     } catch (err: any) {
       setAlert({
@@ -220,67 +357,12 @@ export default function PosPage() {
     }
   };
 
-  // Logout handler
-  const handleLogout = () => {
-    Cookies.remove('access_token');
-    Cookies.remove('token');
-    Cookies.remove('user_role');
-    if (typeof window !== 'undefined') {
-      localStorage.clear();
-    }
-    router.push('/login');
-  };
-
   return (
-    <div className="min-h-screen bg-neutral-950 text-white flex flex-col font-sans selection:bg-emerald-500 selection:text-black">
-      {/* Top Navbar Header */}
-      <header className="border-b border-neutral-800 bg-black/60 backdrop-blur-md sticky top-0 z-30 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500 text-black flex items-center justify-center font-black text-sm">
-            POS
-          </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
-              SOLIT POS <span className="text-[10px] text-neutral-400 font-normal">v1.0 (Zero-Friction)</span>
-            </h1>
-            <p className="text-[11px] text-neutral-400">Terminal Kasir & Integrasi Otomatis Akuntansi</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 text-xs">
-          <div className="hidden sm:flex items-center gap-2 bg-neutral-900 px-3 py-1.5 rounded-full border border-neutral-800">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-neutral-300">Kasir: <strong className="text-white">{user?.name || 'Budi Kasir'}</strong></span>
-            <Badge variant="outline" className="text-[10px] border-neutral-700 text-neutral-300 py-0 px-1.5 ml-1">
-              {user?.role || 'KASIR'}
-            </Badge>
-          </div>
-
-          <Link href="/dashboard">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-neutral-300 hover:text-white border-neutral-800 bg-neutral-900">
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Dashboard</span>
-            </Button>
-          </Link>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="h-8 gap-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Keluar</span>
-          </Button>
-        </div>
-      </header>
-
-      {/* Main POS Container (Grid 2 Kolom) */}
-      <main className="flex-1 p-4 lg:p-6 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* ============================================================ */}
-        {/* KOLOM KIRI: AREA SCANNER BARCODE & DAFTAR KERANJANG (7 Col) */}
-        {/* ============================================================ */}
-        <section className="lg:col-span-7 flex flex-col space-y-4">
+    <div className="flex-1 p-4 lg:p-6 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
+      {/* ============================================================ */}
+      {/* KOLOM KIRI: AREA SCANNER BARCODE & DAFTAR KERANJANG (7 Col) */}
+      {/* ============================================================ */}
+      <section className="lg:col-span-7 flex flex-col space-y-4">
           {/* Card Scanner Form */}
           <Card className="border-neutral-800 bg-neutral-900/60 shadow-lg">
             <CardHeader className="pb-3 pt-4 px-5">
@@ -295,6 +377,31 @@ export default function PosPage() {
               </div>
             </CardHeader>
             <CardContent className="px-5 pb-5">
+              {/* Notifikasi Jika Shift Belum Dibuka */}
+              {!currentShift && !isLoadingShift && (
+                <div className="mb-4 p-3.5 rounded-xl border border-amber-900/60 bg-amber-950/30 text-amber-200 text-xs flex items-center justify-between gap-3 animate-in fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-amber-300">Shift Kasir Belum Dibuka</div>
+                      <div className="text-[11px] text-amber-200/80">
+                        Deklarasikan modal kas awal di laci sebelum memulai penjualan POS.
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setStartingCashInput(200000);
+                      setIsOpenShiftModal(true);
+                    }}
+                    className="h-8 px-3 bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs shrink-0 cursor-pointer"
+                  >
+                    Buka Shift
+                  </Button>
+                </div>
+              )}
+
               <form onSubmit={handleScanSubmit} className="relative flex items-center gap-2">
                 <div className="relative flex-1">
                   <Input
@@ -606,7 +713,6 @@ export default function PosPage() {
             </div>
           </Card>
         </section>
-      </main>
 
       {/* ============================================================ */}
       {/* MODAL DIALOG STRUK DIGITAL SUKSES (Siap Cetak / Thermal)     */}
@@ -689,6 +795,338 @@ export default function PosPage() {
                 className="flex-1 bg-white text-black hover:bg-neutral-200 font-semibold h-10 text-xs"
               >
                 <span>Transaksi Baru</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL DIALOG BUKA SHIFT KASIR (Modal Awal)                   */}
+      {/* ============================================================ */}
+      {isOpenShiftModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-neutral-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Unlock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Buka Shift Kasir Baru</h3>
+                  <p className="text-[11px] text-neutral-400">Deklarasikan modal kas kecil awal di laci</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsOpenShiftModal(false)}
+                className="w-7 h-7 p-0 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-full"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <form onSubmit={handleOpenShift} className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-300">
+                  Modal Awal Uang Fisik (Starting Cash)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs text-neutral-500 font-mono">Rp</span>
+                  <Input
+                    autoFocus
+                    type="number"
+                    value={startingCashInput}
+                    onChange={(e) =>
+                      setStartingCashInput(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                    placeholder="Contoh: 200000"
+                    disabled={isSubmittingShift}
+                    className="h-10 pl-9 font-mono bg-black border-neutral-700 text-white placeholder:text-neutral-600 focus:border-emerald-500"
+                  />
+                </div>
+                <p className="text-[11px] text-neutral-400">
+                  Uang pecahan kembalian yang disiapkan di laci kasir sebelum transaksi dimulai.
+                </p>
+              </div>
+
+              {/* Tombol Cepat Nominal */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-neutral-400 font-medium">Pilihan Cepat:</span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[100000, 200000, 300000, 500000].map((val) => (
+                    <Button
+                      key={val}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStartingCashInput(val)}
+                      className={`h-8 text-[11px] border-neutral-800 ${
+                        startingCashInput === val
+                          ? 'border-emerald-500 text-emerald-400 bg-emerald-950/30 font-bold'
+                          : 'bg-black text-neutral-300 hover:bg-neutral-800'
+                      }`}
+                    >
+                      {formatRupiah(val).replace('Rp', '').trim()}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsOpenShiftModal(false)}
+                  disabled={isSubmittingShift}
+                  className="flex-1 border-neutral-700 text-neutral-300 hover:bg-neutral-800 h-10 text-xs"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmittingShift || startingCashInput === '' || Number(startingCashInput) < 0}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold h-10 text-xs cursor-pointer"
+                >
+                  {isSubmittingShift ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                      <span>Membuka...</span>
+                    </>
+                  ) : (
+                    <span>Konfirmasi Buka Shift</span>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL DIALOG TUTUP SHIFT KASIR (Cash Settlement)             */}
+      {/* ============================================================ */}
+      {isCloseShiftModal && currentShift && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-neutral-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Tutup Shift Kasir (Cash Settlement)</h3>
+                  <p className="text-[11px] text-neutral-400">
+                    Rekonsiliasi uang fisik laci dengan pencatatan sistem
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsCloseShiftModal(false)}
+                className="w-7 h-7 p-0 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-full"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <form onSubmit={handleCloseShift} className="p-5 space-y-4">
+              {/* Ringkasan Saldo Buku Kas */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl">
+                  <div className="text-[10px] text-neutral-400 font-medium">Modal Awal</div>
+                  <div className="text-xs sm:text-sm font-bold font-mono text-white mt-1">
+                    {formatRupiah(Number(currentShift.shift?.startingCash || 0))}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl">
+                  <div className="text-[10px] text-emerald-400 font-medium">Penjualan Tunai (Cash)</div>
+                  <div className="text-xs sm:text-sm font-bold font-mono text-emerald-400 mt-1">
+                    +{formatRupiah(Number(currentShift.totalPenjualanCash || 0))}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl">
+                  <div className="text-[10px] text-amber-400 font-medium">Target Fisik (Expected)</div>
+                  <div className="text-xs sm:text-sm font-bold font-mono text-amber-400 mt-1">
+                    ={formatRupiah(Number(currentShift.expectedEndingCash || 0))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Input Uang Fisik Aktual */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-200 flex items-center justify-between">
+                  <span>Uang Fisik Aktual di Laci (Dihitung Kasir)</span>
+                  <span className="text-[10px] text-neutral-400 font-normal">Wajib dihitung fisik</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs text-neutral-500 font-mono">Rp</span>
+                  <Input
+                    autoFocus
+                    type="number"
+                    value={actualEndingCashInput}
+                    onChange={(e) =>
+                      setActualEndingCashInput(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                    placeholder={`Contoh: ${currentShift.expectedEndingCash}`}
+                    disabled={isSubmittingShift}
+                    className="h-11 pl-9 text-base font-mono bg-black border-neutral-700 text-white placeholder:text-neutral-600 focus:border-emerald-500 font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Perhitungan Selisih Kas Real-Time */}
+              {actualEndingCashInput !== '' && (() => {
+                const actual = Number(actualEndingCashInput);
+                const expected = Number(currentShift.expectedEndingCash || 0);
+                const diff = actual - expected;
+
+                if (diff === 0) {
+                  return (
+                    <div className="p-3 rounded-xl border border-emerald-800 bg-emerald-950/40 text-emerald-200 text-xs flex items-start gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-bold text-emerald-300">Selisih: Rp 0 (Balance Sempurna)</div>
+                        <div className="text-[11px] text-emerald-400/90 mt-0.5">
+                          Uang fisik di laci cocok 100% dengan pencatatan transaksi kasir di sistem.
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else if (diff < 0) {
+                  return (
+                    <div className="p-3 rounded-xl border border-red-800 bg-red-950/40 text-red-200 text-xs flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-bold text-red-300 flex items-center gap-1.5">
+                          <span>Uang Fisik Kurang (Shortage): -{formatRupiah(Math.abs(diff))}</span>
+                        </div>
+                        <div className="text-[11px] text-red-300/90 mt-0.5 leading-relaxed">
+                          Sistem akan otomatis mencatat Jurnal Akuntansi:
+                          <br />
+                          • <strong className="text-white">DEBIT 530 (Beban Selisih Kas):</strong> {formatRupiah(Math.abs(diff))}
+                          <br />
+                          • <strong className="text-white">KREDIT 110 (Kas Toko):</strong> {formatRupiah(Math.abs(diff))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="p-3 rounded-xl border border-sky-800 bg-sky-950/40 text-sky-200 text-xs flex items-start gap-2.5">
+                      <TrendingUp className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-bold text-sky-300">
+                          Uang Fisik Lebih (Overage): +{formatRupiah(diff)}
+                        </div>
+                        <div className="text-[11px] text-sky-300/90 mt-0.5 leading-relaxed">
+                          Sistem akan otomatis mencatat Jurnal Akuntansi:
+                          <br />
+                          • <strong className="text-white">DEBIT 110 (Kas Toko):</strong> {formatRupiah(diff)}
+                          <br />
+                          • <strong className="text-white">KREDIT 410 (Pendapatan Lain):</strong> {formatRupiah(diff)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+              })()}
+
+              <div className="pt-2 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCloseShiftModal(false)}
+                  disabled={isSubmittingShift}
+                  className="flex-1 border-neutral-700 text-neutral-300 hover:bg-neutral-800 h-10 text-xs"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmittingShift || actualEndingCashInput === '' || Number(actualEndingCashInput) < 0}
+                  className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold h-10 text-xs cursor-pointer"
+                >
+                  {isSubmittingShift ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                      <span>Menyelesaikan...</span>
+                    </>
+                  ) : (
+                    <span>Tutup Shift & Catat Jurnal</span>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL DIALOG HASIL TUTUP SHIFT (Settlement Result)           */}
+      {/* ============================================================ */}
+      {settlementResult && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="bg-neutral-950 border-b border-neutral-800 p-5 text-center">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2 font-bold">
+                ✓
+              </div>
+              <h3 className="text-base font-bold text-white">Shift Kasir Resmi Ditutup</h3>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Buku kas laci telah diselesaikan & neraca tetap seimbang
+              </p>
+            </div>
+
+            <div className="p-5 space-y-3 text-xs font-mono">
+              <div className="flex justify-between border-b border-neutral-800 pb-2">
+                <span className="text-neutral-400">Modal Awal:</span>
+                <span className="text-white">{formatRupiah(Number(settlementResult.shift?.startingCash || 0))}</span>
+              </div>
+              <div className="flex justify-between border-b border-neutral-800 pb-2">
+                <span className="text-neutral-400">Expected (Target Sistem):</span>
+                <span className="text-white">{formatRupiah(Number(settlementResult.shift?.expectedEndingCash || 0))}</span>
+              </div>
+              <div className="flex justify-between border-b border-neutral-800 pb-2">
+                <span className="text-neutral-400">Uang Fisik Dihitung:</span>
+                <span className="text-white font-bold">{formatRupiah(Number(settlementResult.shift?.actualEndingCash || 0))}</span>
+              </div>
+              <div className="flex justify-between border-b border-neutral-800 pb-2">
+                <span className="text-neutral-400">Selisih Kas:</span>
+                <span className={`font-bold ${
+                  settlementResult.selisih < 0 ? 'text-red-400' : settlementResult.selisih > 0 ? 'text-sky-400' : 'text-emerald-400'
+                }`}>
+                  {settlementResult.selisih < 0
+                    ? `-${formatRupiah(Math.abs(settlementResult.selisih))}`
+                    : settlementResult.selisih > 0
+                    ? `+${formatRupiah(settlementResult.selisih)}`
+                    : 'Rp 0 (Pas)'}
+                </span>
+              </div>
+
+              {settlementResult.journalEntry ? (
+                <div className="pt-2 text-[11px] text-neutral-400 bg-neutral-950 p-3 rounded-lg border border-neutral-800/80 font-sans">
+                  <div className="text-emerald-400 font-bold mb-1">Jurnal Selisih Kas Dibuat:</div>
+                  <div>No Entry: <strong className="text-white font-mono">{settlementResult.journalEntry.entryNumber}</strong></div>
+                  <div>Deskripsi: <span className="text-neutral-300">{settlementResult.journalEntry.description}</span></div>
+                </div>
+              ) : (
+                <div className="pt-2 text-[11px] text-neutral-400 text-center font-sans">
+                  Tidak ada selisih kas. Buku besar kas identik 100% dengan fisik laci.
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-black/50 border-t border-neutral-800 flex">
+              <Button
+                onClick={() => setSettlementResult(null)}
+                className="w-full bg-white text-black hover:bg-neutral-200 font-semibold h-10 text-xs cursor-pointer"
+              >
+                Selesai
               </Button>
             </div>
           </div>

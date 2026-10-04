@@ -21,7 +21,19 @@ import {
   BookOpen,
   Lock,
   Laptop,
+  RotateCcw,
+  Ban,
+  Loader2,
 } from 'lucide-react';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -30,6 +42,10 @@ export default function DashboardPage() {
   const [plSummary, setPlSummary] = useState<any>(null);
   const [tbIsBalanced, setTbIsBalanced] = useState<boolean>(true);
   const [loadingStats, setLoadingStats] = useState<boolean>(false);
+  const [posTransactions, setPosTransactions] = useState<any[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState<boolean>(false);
+  const [isVoiding, setIsVoiding] = useState<string | null>(null);
+  const [voidFeedback, setVoidFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -48,11 +64,78 @@ export default function DashboardPage() {
         if (parsedUser.role === 'FINANCE' || parsedUser.role === 'OWNER') {
           fetchDashboardStats();
         }
+
+        if (parsedUser.role === 'OWNER') {
+          fetchTransactions(parsedUser);
+        }
       } catch (e) {
         setUser(null);
       }
     }
   }, [router]);
+
+  const fetchTransactions = async (currentUser?: any) => {
+    setLoadingTransactions(true);
+    try {
+      const activeUser = currentUser || user;
+      const res = await fetch('/api/pos/transactions', {
+        headers: {
+          'x-user-role': activeUser?.role || 'OWNER',
+          'x-user-name': activeUser?.name || 'Owner',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosTransactions(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to load POS transactions:', err);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
+  const handleVoidTransaction = async (invoiceNumber: string) => {
+    const confirmed = window.confirm(
+      `Peringatan Otoritas Owner:\n\nApakah Anda yakin ingin membatalkan (VOID) nota [${invoiceNumber}]?\n\n- Seluruh unit laptop akan otomatis dikembalikan ke status 'AVAILABLE'.\n- Jurnal Pembalik (Reversal) akan otomatis dicatat untuk merapikan Laba/Rugi.`
+    );
+    if (!confirmed) return;
+
+    setIsVoiding(invoiceNumber);
+    setVoidFeedback(null);
+
+    try {
+      const res = await fetch(`/api/pos/void/${encodeURIComponent(invoiceNumber)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': user?.role || 'OWNER',
+          'x-user-name': user?.name || 'Dimas Owner',
+          'x-user-id': user?.id || 'owner-id',
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Gagal membatalkan transaksi');
+      }
+
+      setVoidFeedback({
+        type: 'success',
+        message: data.message || `Invoice [${invoiceNumber}] berhasil di-VOID!`,
+      });
+
+      // Refresh data transaksi & neraca/laba rugi otomatis
+      await Promise.all([fetchTransactions(), fetchDashboardStats()]);
+    } catch (err: any) {
+      setVoidFeedback({
+        type: 'error',
+        message: err.message || 'Terjadi kesalahan saat membatalkan transaksi',
+      });
+    } finally {
+      setIsVoiding(null);
+    }
+  };
 
   const fetchDashboardStats = async () => {
     setLoadingStats(true);
@@ -101,12 +184,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-black text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
       {/* SIDEBAR COMPONENT (LEFT NAVIGATION BAR) */}
       <Sidebar />
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 p-6 lg:p-8 space-y-6 overflow-y-auto">
+      <div className="flex-1 min-w-0 p-6 lg:p-8 space-y-6 overflow-y-auto">
         {/* HEADER UTAMA */}
         <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-800 pb-5">
           <div>
@@ -451,6 +534,146 @@ export default function DashboardPage() {
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </Link>
+              </CardContent>
+            </Card>
+
+            {/* TABEL RIWAYAT TRANSAKSI POS & KONTROL VOID OWNER */}
+            <Card className="border-neutral-800 bg-neutral-950 shadow-xl">
+              <CardHeader className="pb-3 border-b border-neutral-800/80">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                      <Receipt className="w-5 h-5 text-emerald-400" />
+                      Riwayat Transaksi Penjualan Kasir (POS)
+                    </CardTitle>
+                    <CardDescription className="text-xs text-neutral-400 mt-0.5">
+                      Pengawasan nota kasir. Owner memiliki wewenang membatalkan transaksi (VOID) dengan Auto-Reversal Journal.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchTransactions()}
+                    className="h-8 text-xs border-neutral-800 bg-neutral-900 text-neutral-300 hover:text-white"
+                  >
+                    Refresh Nota
+                  </Button>
+                </div>
+
+                {/* Feedback Alert Void */}
+                {voidFeedback && (
+                  <div
+                    className={`mt-3 p-3 rounded-lg text-xs flex items-center gap-2 ${
+                      voidFeedback.type === 'error'
+                        ? 'border border-red-900 bg-red-950/50 text-red-200'
+                        : 'border border-emerald-900 bg-emerald-950/50 text-emerald-200'
+                    }`}
+                  >
+                    {voidFeedback.type === 'error' ? (
+                      <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    )}
+                    <span>{voidFeedback.message}</span>
+                  </div>
+                )}
+              </CardHeader>
+
+              <CardContent className="p-0">
+                {loadingTransactions ? (
+                  <div className="py-12 text-center text-neutral-500 text-xs flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                    <span>Memuat riwayat transaksi kasir...</span>
+                  </div>
+                ) : posTransactions.length === 0 ? (
+                  <div className="py-12 text-center text-neutral-500 text-xs">
+                    Belum ada riwayat transaksi kasir yang tercatat di database.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-neutral-800 hover:bg-transparent">
+                          <TableHead className="text-xs font-semibold text-neutral-400">No. Invoice</TableHead>
+                          <TableHead className="text-xs font-semibold text-neutral-400">Waktu</TableHead>
+                          <TableHead className="text-xs font-semibold text-neutral-400">Kasir</TableHead>
+                          <TableHead className="text-xs font-semibold text-neutral-400">Unit / Serial Number</TableHead>
+                          <TableHead className="text-right text-xs font-semibold text-neutral-400">Total Penjualan</TableHead>
+                          <TableHead className="text-center text-xs font-semibold text-neutral-400">Status</TableHead>
+                          <TableHead className="text-center text-xs font-semibold text-neutral-400">Aksi Otoritas</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {posTransactions.map((tx: any) => {
+                          const isVoid = tx.status === 'VOID';
+                          const displayInvoice = tx.invoiceNumber || tx.id.slice(0, 13);
+                          const dateFormatted = new Date(tx.tanggal).toLocaleString('id-ID', {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          });
+
+                          return (
+                            <TableRow key={tx.id} className="border-neutral-800 hover:bg-neutral-900/40">
+                              <TableCell className="font-mono text-xs font-bold text-white">
+                                {displayInvoice}
+                              </TableCell>
+                              <TableCell className="text-xs text-neutral-400 whitespace-nowrap">
+                                {dateFormatted}
+                              </TableCell>
+                              <TableCell className="text-xs text-neutral-300">
+                                {tx.cashierName || 'Kasir'}
+                              </TableCell>
+                              <TableCell className="text-xs font-mono text-neutral-300 max-w-[220px] truncate">
+                                {tx.serialNumber}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-bold text-white text-xs">
+                                {formatRupiah(Number(tx.totalPrice))}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {isVoid ? (
+                                  <Badge variant="outline" className="border-red-800 bg-red-950/60 text-red-300 text-[10px] font-mono">
+                                    VOID
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="border-emerald-800 bg-emerald-950/60 text-emerald-300 text-[10px] font-mono">
+                                    SUCCESS
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {isVoid ? (
+                                  <span className="text-[11px] text-neutral-500 font-mono italic">
+                                    Dibatalkan
+                                  </span>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isVoiding === (tx.invoiceNumber || tx.id)}
+                                    onClick={() => handleVoidTransaction(tx.invoiceNumber || tx.id)}
+                                    className="h-7 px-3 text-xs font-semibold border-red-800 bg-red-950/50 text-red-300 hover:bg-red-800 hover:text-white transition-all cursor-pointer gap-1.5"
+                                  >
+                                    {isVoiding === (tx.invoiceNumber || tx.id) ? (
+                                      <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Proses...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Ban className="w-3.5 h-3.5 text-red-400" />
+                                        <span>Void Transaksi</span>
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

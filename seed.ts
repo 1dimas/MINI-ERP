@@ -53,6 +53,7 @@ async function main() {
     { code: '440', name: 'HPP Penjualan', type: 'BEBAN', normalBalance: 'DEBIT' },
     { code: '510', name: 'Beban Gaji', type: 'BEBAN', normalBalance: 'DEBIT' },
     { code: '520', name: 'Beban Listrik & Air', type: 'BEBAN', normalBalance: 'DEBIT' },
+    { code: '530', name: 'Beban Selisih Kas', type: 'BEBAN', normalBalance: 'DEBIT' },
   ];
 
   for (const item of coaData) {

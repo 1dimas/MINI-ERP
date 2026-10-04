@@ -101,13 +101,32 @@ model ProductUnit {
   updatedAt         DateTime     @updatedAt
 }
 
+model CashierShift {
+  id                  String    @id @default(uuid())
+  userId              String    // ID user Kasir
+  startTime           DateTime  @default(now())
+  endTime             DateTime?
+  startingCash        Decimal   @db.Decimal(15, 2) // Modal awal (kembalian) di laci
+  expectedEndingCash  Decimal?  @db.Decimal(15, 2) // Perhitungan sistem
+  actualEndingCash    Decimal?  @db.Decimal(15, 2) // Uang fisik yang dihitung kasir
+  status              String    @default("OPEN")  // OPEN, CLOSED
+
+  transactions        PosTransaction[]
+}
+
 model PosTransaction {
-  id            String       @id @default(uuid())
-  tanggal       DateTime     @default(now())
-  serialNumber  String
-  productUnitId String?
-  productUnit   ProductUnit? @relation(fields: [productUnitId], references: [id])
-  totalPrice    Decimal      @db.Decimal(15, 2)
-  totalHpp      Decimal      @db.Decimal(15, 2) 
-  cashierName   String?
+  id             String        @id @default(uuid())
+  invoiceNumber  String?       @unique
+  status         String        @default("SUCCESS") // "SUCCESS", "VOID"
+  paymentMethod  String        @default("CASH")    // "CASH", "TRANSFER"
+  tanggal        DateTime      @default(now())
+  serialNumber   String
+  productUnitId  String?
+  productUnit    ProductUnit?  @relation(fields: [productUnitId], references: [id])
+  totalPrice     Decimal       @db.Decimal(15, 2)
+  totalHpp       Decimal       @db.Decimal(15, 2) 
+  cashierName    String?
+  journalEntryId String?
+  shiftId        String?
+  shift          CashierShift? @relation(fields: [shiftId], references: [id])
 }

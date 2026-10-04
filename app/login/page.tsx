@@ -76,15 +76,41 @@ function LoginFormContent() {
         saveSession(token, data.user);
       }
 
-      setMessage('Login berhasil! Mengalihkan ke sistem...');
+      const targetRoute = getRoleTargetRoute(token, data.user);
+      const targetLabel = targetRoute === '/pos' ? 'Terminal Kasir (POS)...' : 'Dashboard Utama...';
+
+      setMessage(`Login berhasil! Mengalihkan ke ${targetLabel}`);
       setTimeout(() => {
-        router.push(redirectPath);
+        router.push(targetRoute);
       }, 400);
     } catch (err: any) {
       setError(err.message || 'Terjadi kesalahan saat login');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper menentukan rute tujuan berdasarkan role
+  const getRoleTargetRoute = (token?: string, userObj?: any): string => {
+    let role = userObj?.role;
+    if (!role && token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payloadStr = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+          const payload = JSON.parse(payloadStr);
+          role = payload.role;
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    const normalizedRole = (role || '').toUpperCase();
+    if (normalizedRole === 'KASIR') {
+      return '/pos';
+    }
+    return '/dashboard';
   };
 
   // 2. Submit Verifikasi 2FA (OTP)
@@ -118,9 +144,12 @@ function LoginFormContent() {
         saveSession(token, data.user);
       }
 
-      setMessage('Verifikasi 2FA sukses! Mengalihkan ke Dashboard...');
+      const targetRoute = getRoleTargetRoute(token, data.user);
+      const targetLabel = targetRoute === '/pos' ? 'Terminal Kasir (POS)...' : 'Dashboard Utama...';
+
+      setMessage(`Verifikasi 2FA sukses! Mengalihkan ke ${targetLabel}`);
       setTimeout(() => {
-        router.push(redirectPath);
+        router.push(targetRoute);
       }, 400);
     } catch (err: any) {
       setError(err.message || 'Verifikasi gagal');

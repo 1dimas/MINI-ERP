@@ -70,9 +70,9 @@ export default function TwoFactorSetupPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-black text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
       <Sidebar />
-      <div className="flex-1 p-6 flex items-center justify-center overflow-y-auto">
+      <div className="flex-1 min-w-0 p-6 flex items-center justify-center overflow-y-auto">
         <div className="w-full max-w-sm">
           <Card className="border-neutral-800 bg-neutral-950">
             <CardHeader>
