@@ -240,4 +240,76 @@ export class ShiftService {
       };
     });
   }
+
+  /**
+   * GET /shift/warnings
+   * Khusus role OWNER: Mencari seluruh shift yang status-nya masih 'OPEN'
+   * dan startTime-nya lebih dari 14 jam yang lalu (shift gantung).
+   */
+  async getOverdueShiftWarnings(user?: { role?: string }) {
+    if (user?.role && user.role !== 'OWNER') {
+      throw new BadRequestException('Hanya role OWNER yang dapat mengakses peringatan shift gantung.');
+    }
+
+    const fourteenHoursAgo = new Date(Date.now() - 14 * 60 * 60 * 1000);
+
+    const overdueShifts = await this.prisma.cashierShift.findMany({
+      where: {
+        status: 'OPEN',
+        startTime: {
+          lte: fourteenHoursAgo,
+        },
+      },
+      include: {
+        transactions: {
+          where: { status: 'SUCCESS' },
+          select: {
+            id: true,
+            totalPrice: true,
+            paymentMethod: true,
+          },
+        },
+      },
+      orderBy: {
+        startTime: 'asc',
+      },
+    });
+
+    if (overdueShifts.length === 0) {
+      return [];
+    }
+
+    // Ambil detail data user kasir
+    const userIds = Array.from(new Set(overdueShifts.map((s) => s.userId)));
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    const now = Date.now();
+
+    return overdueShifts.map((shift) => {
+      const kasirUser = userMap.get(shift.userId);
+      const elapsedHours = Math.floor(
+        (now - new Date(shift.startTime).getTime()) / (1000 * 60 * 60)
+      );
+
+      return {
+        id: shift.id,
+        userId: shift.userId,
+        startTime: shift.startTime,
+        startingCash: Number(shift.startingCash),
+        status: shift.status,
+        elapsedHours,
+        transactionCount: shift.transactions.length,
+        user: kasirUser || {
+          id: shift.userId,
+          name: 'Kasir (ID: ' + shift.userId.slice(0, 8) + ')',
+          email: '-',
+          role: 'KASIR',
+        },
+      };
+    });
+  }
 }

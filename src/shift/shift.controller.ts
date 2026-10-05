@@ -52,4 +52,14 @@ export class ShiftController {
   ) {
     return this.shiftService.closeShift(dto, user);
   }
+
+  /**
+   * GET /shift/warnings: Peringatan shift gantung yang belum ditutup > 14 jam
+   * Akses: HANYA OWNER
+   */
+  @Get('warnings')
+  @Roles(Role.OWNER)
+  async getWarnings(@GetUser() user: { role: string }) {
+    return this.shiftService.getOverdueShiftWarnings(user);
+  }
 }

@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 import { JournalService } from '@/src/journal/journal.service';
 
 const journalService = new JournalService(prisma as any);
 
 export async function GET(req: Request) {
   try {
+    const auth = requireAuth(req, ['OWNER', 'FINANCE']);
+    if (auth instanceof NextResponse) return auth;
+
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status') || undefined;
     const sourceType = searchParams.get('sourceType') || undefined;
@@ -24,13 +28,14 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const roleHeader = req.headers.get('x-user-role') || 'FINANCE';
-    const userIdHeader = req.headers.get('x-user-id') || 'demo-user-id';
+    // FINANCE -> DRAFT, OWNER -> POSTED (diputuskan di service berdasarkan role JWT)
+    const auth = requireAuth(req, ['OWNER', 'FINANCE']);
+    if (auth instanceof NextResponse) return auth;
 
+    const body = await req.json();
     const result = await journalService.createManual(body, {
-      id: userIdHeader,
-      role: roleHeader,
+      id: auth.id,
+      role: auth.role,
     });
 
     return NextResponse.json(result, { status: 201 });

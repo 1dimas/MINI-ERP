@@ -192,6 +192,7 @@ export class InventoryService {
           sourceType: 'RESTOCK',
           status: 'DRAFT',
           total: hpp,
+          createdBy: userContext?.id || null,
           lines: {
             create: [
               {
@@ -219,6 +220,7 @@ export class InventoryService {
           hpp,
           price,
           status: 'QC_PENDING',
+          createdBy: userContext?.id || null,
           isFisikNormal: isNew ? true : isFisikNormal,
           isMesinNormal: isNew ? true : isMesinNormal,
           isStorageNormal: isNew ? true : isStorageNormal,
@@ -369,16 +371,25 @@ export class InventoryService {
     const nextStatus = allQcPassed ? 'AVAILABLE' : 'IN_REPAIR';
 
     return await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
       if (unit.purchaseJournalId) {
         await tx.journalEntry.update({
           where: { id: unit.purchaseJournalId },
-          data: { status: 'POSTED' },
+          data: {
+            status: 'POSTED',
+            approvedBy: userContext?.id || null,
+            approvedAt: now,
+          },
         });
       }
 
       return await tx.productUnit.update({
         where: { id: unitId },
-        data: { status: nextStatus },
+        data: {
+          status: nextStatus,
+          approvedBy: userContext?.id || null,
+          approvedAt: now,
+        },
         include: {
           productModel: true,
           purchaseJournal: true,
@@ -623,86 +634,5 @@ export class InventoryService {
     });
   }
 
-  /**
-   * 9. POS CHECKOUT (Terminal Kasir Penjualan)
-   */
-  async checkoutPos(serialNumber: string, userContext: UserContext, paymentAccountCode = '110') {
-    const normalizedSn = serialNumber.trim().toUpperCase();
 
-    const unit = await this.prisma.productUnit.findUnique({
-      where: { serialNumber: normalizedSn },
-      include: { productModel: true },
-    });
-
-    if (!unit) {
-      const error: any = new Error(`Unit Laptop dengan Serial Number "${normalizedSn}" tidak ditemukan di inventaris!`);
-      error.status = 404;
-      throw error;
-    }
-
-    if (unit.status !== 'AVAILABLE') {
-      let statusMsg = unit.status;
-      if (unit.status === 'QC_PENDING') statusMsg = 'Masih QC_PENDING (Belum disetujui Owner)';
-      if (unit.status === 'IN_REPAIR') statusMsg = 'Masih IN_REPAIR (Dalam perbaikan)';
-      if (unit.status === 'SOLD') statusMsg = 'Sudah Terjual (SOLD OUT)';
-
-      const error: any = new Error(`Unit ${normalizedSn} tidak dapat dijual! Status saat ini: ${statusMsg}.`);
-      error.status = 400;
-      throw error;
-    }
-
-    const price = Number(unit.price);
-    const hpp = Number(unit.hpp);
-
-    return await this.prisma.$transaction(async (tx) => {
-      // 1. Mark unit as SOLD
-      const updatedUnit = await tx.productUnit.update({
-        where: { id: unit.id },
-        data: { status: 'SOLD' },
-        include: { productModel: true },
-      });
-
-      // 2. Insert POS Journal Entry (Pendapatan & HPP Mutlak)
-      const journalEntry = await tx.journalEntry.create({
-        data: {
-          keterangan: `Penjualan POS Unit ${unit.productModel.name} (SN: ${normalizedSn})`,
-          sourceType: 'POS',
-          status: 'POSTED',
-          total: price,
-          lines: {
-            create: [
-              { accountCode: paymentAccountCode, side: 'DEBIT', nominal: price },
-              { accountCode: '410', side: 'KREDIT', nominal: price },
-              { accountCode: '440', side: 'DEBIT', nominal: hpp },
-              { accountCode: '130', side: 'KREDIT', nominal: hpp },
-            ],
-          },
-        },
-      });
-
-      // 3. Insert PosTransaction log
-      const posTx = await tx.posTransaction.create({
-        data: {
-          serialNumber: normalizedSn,
-          productUnitId: unit.id,
-          totalPrice: price,
-          totalHpp: hpp,
-          cashierName: userContext.name || 'Kasir Toko',
-        },
-      });
-
-      return {
-        success: true,
-        message: `Transaksi POS berhasil! Unit ${normalizedSn} tercatat TERJUAL.`,
-        transaction: {
-          id: posTx.id,
-          serialNumber: normalizedSn,
-          totalPrice: price,
-          totalHpp: hpp,
-          journalId: journalEntry.id,
-        },
-        unit: updatedUnit,
-      };
-    });
-  }
 }

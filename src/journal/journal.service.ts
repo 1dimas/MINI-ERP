@@ -126,6 +126,9 @@ export class JournalService {
           status,
           total: totalDebit,
           isEdited: false,
+          createdBy: user.id,
+          approvedBy: status === 'POSTED' ? user.id : null,
+          approvedAt: status === 'POSTED' ? transDate : null,
           lines: {
             create: dto.lines.map((line) => ({
               accountCode: line.accountCode,
@@ -165,6 +168,12 @@ export class JournalService {
 
     if (!existingEntry) {
       throw new NotFoundException(`Jurnal dengan ID '${id}' tidak ditemukan.`);
+    }
+
+    if (existingEntry.sourceType !== 'MANUAL') {
+      throw new ForbiddenException(
+        'Jurnal sistem tidak boleh diedit secara manual. Gunakan fitur Void/Retur.',
+      );
     }
 
     let newTotal = Number(existingEntry.total);
@@ -239,7 +248,11 @@ export class JournalService {
    * PATCH /journal/audit/:id: Eksekusi Audit (Bisa dilakukan oleh FINANCE & OWNER)
    * Payload: { "action": "APPROVE" | "REJECT" }
    */
-  async auditStatus(id: string, auditDto: AuditJournalDto) {
+  async auditStatus(
+    id: string,
+    auditDto: AuditJournalDto,
+    user?: { id?: string; role?: string },
+  ) {
     const entry = await this.prisma.journalEntry.findUnique({
       where: { id },
     });
@@ -260,7 +273,11 @@ export class JournalService {
     return this.prisma.$transaction(async (tx) => {
       return tx.journalEntry.update({
         where: { id },
-        data: { status: newStatus },
+        data: {
+          status: newStatus,
+          approvedBy: user?.id || null,
+          approvedAt: new Date(),
+        },
         include: {
           lines: {
             include: {

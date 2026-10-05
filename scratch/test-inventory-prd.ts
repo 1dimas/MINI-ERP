@@ -66,8 +66,25 @@ async function runPrdVerification() {
 
   // 3. TEST: Kasir Status Protection (Cannot checkout QC_PENDING)
   console.log('\n3. Testing Kasir Status Gatekeeper Protection...');
+  // Buka shift kasir terlebih dahulu
+  await prisma.cashierShift.deleteMany({ where: { userId: 'kasir-01' } });
+  await prisma.cashierShift.create({
+    data: {
+      userId: 'kasir-01',
+      startingCash: 500000,
+      status: 'OPEN',
+    },
+  });
+
+  const { PosService } = await import('../src/pos/pos.service');
+  const { PaymentMethod } = await import('../src/pos/dto/checkout.dto');
+  const posService = new PosService(prisma as any);
+
   try {
-    await inventoryService.checkoutPos(testSn, { id: 'kasir-01', role: 'KASIR', name: 'Budi Kasir' });
+    await posService.checkout(
+      { items: [testSn], amountPaid: 12000000, paymentMethod: PaymentMethod.CASH },
+      { id: 'kasir-01', role: 'KASIR', name: 'Budi Kasir' }
+    );
     console.error('   ❌ ERROR: Kasir was able to checkout a QC_PENDING unit!');
   } catch (err: any) {
     console.log(`   ✅ SUCCESS: Kasir Checkout blocked! Error message: "${err.message}"`);
@@ -94,10 +111,9 @@ async function runPrdVerification() {
 
   // 6. TEST: Successful Kasir POS Checkout with Strict HPP Auto-Journal
   console.log('\n6. Testing Successful POS Checkout for AVAILABLE Unit...');
-  const checkoutResult = await inventoryService.checkoutPos(
-    testSn,
-    { id: 'kasir-01', role: 'KASIR', name: 'Budi Kasir' },
-    '110'
+  const checkoutResult = await posService.checkout(
+    { items: [testSn], amountPaid: 12000000, paymentMethod: PaymentMethod.CASH },
+    { id: 'kasir-01', role: 'KASIR', name: 'Budi Kasir' }
   );
   console.log(`   ✅ ${checkoutResult.message}`);
   console.log('\n=== ALL PRD INVENTORY TESTS PASSED PERFECTLY ===\n');

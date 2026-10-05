@@ -8,7 +8,8 @@ import { RolesGuard } from './guards/roles.guard';
 @Module({
   imports: [
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'super-secret-key-change-in-production',
+      // Fail-safe: tanpa fallback hardcoded. JWT_SECRET wajib ada di .env
+      secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '1d' },
     }),
   ],

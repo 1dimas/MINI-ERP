@@ -49,8 +49,11 @@ export class CashflowController {
    */
   @Patch('approve/:id')
   @Roles(Role.OWNER)
-  async approve(@Param('id') id: string) {
-    return this.cashflowService.approve(id);
+  async approve(
+    @Param('id') id: string,
+    @GetUser() user: { id: string; role: string },
+  ) {
+    return this.cashflowService.approve(id, user);
   }
 
   /**
@@ -59,7 +62,10 @@ export class CashflowController {
    */
   @Patch('reject/:id')
   @Roles(Role.OWNER)
-  async reject(@Param('id') id: string) {
-    return this.cashflowService.reject(id);
+  async reject(
+    @Param('id') id: string,
+    @GetUser() user: { id: string; role: string },
+  ) {
+    return this.cashflowService.reject(id, user);
   }
 }

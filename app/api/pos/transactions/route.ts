@@ -1,20 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 import { PosService } from '@/src/pos/pos.service';
 
 const posService = new PosService(prisma as any);
 
 export async function GET(req: Request) {
   try {
-    const roleHeader = (req.headers.get('x-user-role') || '') as string;
-
     // Akses riwayat: KASIR dan OWNER
-    if (roleHeader !== 'OWNER' && roleHeader !== 'KASIR') {
-      return NextResponse.json(
-        { message: 'Akses ditolak ke riwayat transaksi kasir.' },
-        { status: 403 }
-      );
-    }
+    const auth = requireAuth(req, ['KASIR', 'OWNER']);
+    if (auth instanceof NextResponse) return auth;
 
     const transactions = await posService.getTransactions();
     return NextResponse.json(transactions);

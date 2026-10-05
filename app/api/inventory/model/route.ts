@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 import { InventoryService } from '@/src/inventory/inventory.service';
 
 const inventoryService = new InventoryService(prisma);
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = requireAuth(req, ['OWNER', 'FINANCE', 'KASIR']);
+    if (auth instanceof NextResponse) return auth;
+
     const models = await inventoryService.findAllModels();
     return NextResponse.json(models);
   } catch (error: any) {
@@ -18,6 +22,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = requireAuth(req, ['OWNER', 'FINANCE']);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await req.json();
     const result = await inventoryService.createModel(body);
     return NextResponse.json(result, { status: 201 });

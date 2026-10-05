@@ -6,6 +6,7 @@ import { JournalModule } from './journal/journal.module';
 import { CashflowModule } from './cashflow/cashflow.module';
 import { PosModule } from './pos/pos.module';
 import { ShiftModule } from './shift/shift.module';
+import { SystemModule } from './system/system.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ShiftModule } from './shift/shift.module';
     CashflowModule,
     PosModule,
     ShiftModule,
+    SystemModule,
   ],
 })
 export class AppModule {}

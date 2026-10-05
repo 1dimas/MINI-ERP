@@ -1,4 +1,14 @@
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-production';
+/**
+ * Fail-safe: JWT_SECRET WAJIB di-set via environment.
+ * Tanpa fallback hardcoded — secret yang tertulis di repo = siapa pun bisa memalsukan token OWNER.
+ */
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('JWT_SECRET belum di-set (minimal 32 karakter). Tambahkan ke file .env');
+  }
+  return secret;
+}
 
 export interface TokenPayload {
   sub: string;
@@ -37,7 +47,7 @@ function base64UrlDecode(str: string): string {
 export async function signJwt(
   payload: Omit<TokenPayload, 'iat' | 'exp'>,
   expiresInSeconds = 86400,
-  secret = JWT_SECRET
+  secret = getJwtSecret()
 ): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
@@ -76,18 +86,9 @@ export async function signJwt(
  */
 export async function verifyJwt(
   token: string,
-  secret = JWT_SECRET
+  secret = getJwtSecret()
 ): Promise<TokenPayload | null> {
   if (!token || typeof token !== 'string') return null;
-
-  // Toleransi legacy token mock jika ada
-  if (token.startsWith('jwt-token-demo-') || token.startsWith('jwt-token-final-2fa-')) {
-    return {
-      sub: 'demo-user',
-      email: 'user@solitpos.com',
-      role: 'KASIR',
-    };
-  }
 
   const parts = token.split('.');
   if (parts.length !== 3) return null;
@@ -97,6 +98,11 @@ export async function verifyJwt(
   try {
     const payloadStr = base64UrlDecode(encodedPayload);
     const payload: TokenPayload = JSON.parse(payloadStr);
+
+    // Tolak token tanpa identitas lengkap
+    if (!payload.sub || !payload.role) {
+      return null;
+    }
 
     // Cek kadaluarsa token
     if (payload.exp && payload.exp * 1000 < Date.now()) {

@@ -36,9 +36,14 @@ model JournalEntry {
   keterangan  String
   sourceType  String        // "POS", "SERVICE", "CASHFLOW", "MANUAL", "PURCHASE_UNIT", "RESTOCK"
   sourceId    String?       
-  status      String        @default("POSTED") // "DRAFT", "POSTED"
+  status      String        @default("POSTED") // "DRAFT", "POSTED", "REJECTED"
   total       Decimal       @db.Decimal(15, 2)
   isEdited    Boolean       @default(false)
+  
+  // Audit Trail
+  createdBy   String?
+  approvedBy  String?
+  approvedAt  DateTime?
   
   lines       JournalLine[]
   productUnit ProductUnit?
@@ -95,6 +100,11 @@ model ProductUnit {
   purchaseJournalId String?       @unique
   purchaseJournal   JournalEntry? @relation(fields: [purchaseJournalId], references: [id], onDelete: SetNull)
 
+  // Audit Trail
+  createdBy         String?
+  approvedBy        String?
+  approvedAt        DateTime?
+
   transactions      PosTransaction[]
 
   createdAt         DateTime     @default(now())
@@ -129,4 +139,9 @@ model PosTransaction {
   journalEntryId String?
   shiftId        String?
   shift          CashierShift? @relation(fields: [shiftId], references: [id])
+
+  // Audit Trail
+  createdBy      String?
+  approvedBy     String?
+  approvedAt     DateTime?
 }

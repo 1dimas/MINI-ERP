@@ -21,8 +21,12 @@ export class PosService {
    */
   async checkout(
     dto: CheckoutDto,
-    user?: { id?: string; name?: string; email?: string; role?: string },
+    user: { id: string; name?: string; email?: string; role?: string },
   ) {
+    if (!user || !user.id) {
+      throw new BadRequestException('Kasir harus terautentikasi.');
+    }
+
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Keranjang belanja kosong. Masukkan minimal 1 unit barang.');
     }
@@ -34,12 +38,9 @@ export class PosService {
       throw new BadRequestException('Terdapat duplikasi Serial Number dalam keranjang transaksi.');
     }
 
-    // Wajib cek apakah kasir memiliki shift 'OPEN'
-    const cashierUserId = user?.id;
+    // Wajib cek apakah kasir memiliki shift 'OPEN' khusus miliknya sendiri
     const activeShift = await this.prisma.cashierShift.findFirst({
-      where: cashierUserId
-        ? { userId: cashierUserId, status: 'OPEN' }
-        : { status: 'OPEN' },
+      where: { userId: user.id, status: 'OPEN' },
     });
 
     if (!activeShift) {
@@ -84,45 +85,76 @@ export class PosService {
         data: { status: 'SOLD' },
       });
 
-      // Generate nomor invoice unik
-      const dateCode = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      const invoiceNumber = `INV-${dateCode}-${randomSuffix}`;
-      const cashierName = user?.name || user?.email || 'Kasir Toko';
+      // Generate nomor invoice berurutan (INV-YYYYMMDD-XXXX)
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const datePrefix = `INV-${yyyy}${mm}${dd}-`;
+
+      const lastTxToday = await tx.posTransaction.findFirst({
+        where: {
+          invoiceNumber: {
+            startsWith: datePrefix,
+          },
+        },
+        orderBy: {
+          invoiceNumber: 'desc',
+        },
+        select: { invoiceNumber: true },
+      });
+
+      let sequence = 1;
+      if (lastTxToday?.invoiceNumber) {
+        const parts = lastTxToday.invoiceNumber.split('-');
+        const lastSeq = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(lastSeq)) {
+          sequence = lastSeq + 1;
+        }
+      }
+      const invoiceNumber = `${datePrefix}${String(sequence).padStart(4, '0')}`;
+      const cashierName = user.name || user.email || 'Kasir Toko';
 
       // 5. Catat Transaksi di tabel PosTransaction
+      const paymentMethod = dto.paymentMethod || 'CASH';
       const posTx = await tx.posTransaction.create({
         data: {
           invoiceNumber,
           status: 'SUCCESS',
-          paymentMethod: dto.paymentMethod || 'CASH',
+          paymentMethod,
           serialNumber: units.map((u) => u.serialNumber).join(', '),
           productUnitId: units.length === 1 ? units[0].id : null,
           totalPrice: totalPenjualan,
           totalHpp: totalHpp,
           cashierName,
           shiftId: activeShift.id,
+          createdBy: user.id,
+          approvedBy: user.id,
+          approvedAt: now,
         },
       });
 
       // 6. Auto-Journal (Krusial): Buat JournalEntry (sourceType: 'POS', status: 'POSTED')
-      // 4 baris JournalLine:
-      // DEBIT  110 (Kas Toko)          = totalPenjualan
-      // KREDIT 410 (Penjualan POS)     = totalPenjualan
-      // DEBIT  440 (HPP Penjualan)     = totalHpp
-      // KREDIT 130 (Persediaan Barang) = totalHpp
+      // Pemetaan Akun Kas / Bank:
+      // CASH -> '110' (Kas Toko)
+      // TRANSFER -> '120' (Bank BCA)
+      const cashAccountCode = paymentMethod === 'TRANSFER' ? '120' : '110';
+
       const journalEntry = await tx.journalEntry.create({
         data: {
-          tanggal: new Date(),
-          keterangan: `Penjualan POS [${invoiceNumber}] - Kasir: ${cashierName}`,
+          tanggal: now,
+          keterangan: `Penjualan POS [${invoiceNumber}] - Kasir: ${cashierName} (${paymentMethod})`,
           sourceType: 'POS',
           sourceId: posTx.id,
           status: 'POSTED',
           total: totalPenjualan,
+          createdBy: user.id,
+          approvedBy: user.id,
+          approvedAt: now,
           lines: {
             create: [
               {
-                accountCode: '110',
+                accountCode: cashAccountCode,
                 side: 'DEBIT',
                 nominal: totalPenjualan,
               },
@@ -261,29 +293,38 @@ export class PosService {
       }
 
       // 4. Tandai Invoice: Ubah status PosTransaction menjadi 'VOID'
+      const voidTime = new Date();
       const updatedTx = await tx.posTransaction.update({
         where: { id: posTx.id },
-        data: { status: 'VOID' },
+        data: {
+          status: 'VOID',
+          approvedBy: user?.id || null,
+          approvedAt: voidTime,
+        },
       });
 
       // 5. Jurnal Pembalik (Reversal): Buat JournalEntry baru dengan sourceType: 'POS_VOID' dan status: 'POSTED'
       // 4 baris JournalLine terbalik dari jurnal kasir:
       // DEBIT  410 (Penjualan POS)     = totalPenjualan (Memotong pengakuan pendapatan)
-      // KREDIT 110 (Kas Toko)          = totalPenjualan (Mengembalikan uang ke konsumen)
+      // KREDIT 110/120 (Kas/Bank)      = totalPenjualan (Mengembalikan uang ke konsumen sesuai metode bayar)
       // DEBIT  130 (Persediaan Barang) = totalHpp        (Menambah kembali nilai aset toko)
       // KREDIT 440 (HPP Penjualan)     = totalHpp        (Memotong beban modal keluar)
       const totalPenjualan = Number(posTx.totalPrice);
       const totalHpp = Number(posTx.totalHpp);
       const displayInvoice = posTx.invoiceNumber || normalizedInvoice;
+      const voidCashAccountCode = posTx.paymentMethod === 'TRANSFER' ? '120' : '110';
 
       const reversalJournal = await tx.journalEntry.create({
         data: {
-          tanggal: new Date(),
-          keterangan: `Void Invoice [${displayInvoice}] - Otorisasi Owner: ${user?.name || 'Owner'}`,
+          tanggal: voidTime,
+          keterangan: `Void Invoice [${displayInvoice}] - Otorisasi Owner: ${user?.name || 'Owner'} (${posTx.paymentMethod})`,
           sourceType: 'POS_VOID',
           sourceId: posTx.id,
           status: 'POSTED',
           total: totalPenjualan,
+          createdBy: user?.id || null,
+          approvedBy: user?.id || null,
+          approvedAt: voidTime,
           lines: {
             create: [
               {
@@ -292,7 +333,7 @@ export class PosService {
                 nominal: totalPenjualan,
               },
               {
-                accountCode: '110',
+                accountCode: voidCashAccountCode,
                 side: 'KREDIT',
                 nominal: totalPenjualan,
               },

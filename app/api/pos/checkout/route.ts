@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 import { PosService } from '@/src/pos/pos.service';
 import { PaymentMethod } from '@/src/pos/dto/checkout.dto';
 
@@ -7,17 +8,9 @@ const posService = new PosService(prisma as any);
 
 export async function POST(req: Request) {
   try {
-    const roleHeader = (req.headers.get('x-user-role') || 'KASIR') as 'OWNER' | 'FINANCE' | 'KASIR';
-    const userIdHeader = req.headers.get('x-user-id') || 'demo-kasir-id';
-    const userNameHeader = req.headers.get('x-user-name') || 'Budi Kasir';
-
     // RBAC: Hanya KASIR dan OWNER yang dapat mengakses modul POS
-    if (roleHeader === 'FINANCE') {
-      return NextResponse.json(
-        { message: 'Akses ditolak. FINANCE tidak diizinkan di terminal POS.' },
-        { status: 403 }
-      );
-    }
+    const auth = requireAuth(req, ['KASIR', 'OWNER']);
+    if (auth instanceof NextResponse) return auth;
 
     const body = await req.json();
 
@@ -44,6 +37,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // Identitas kasir murni dari JWT (diinjeksi middleware), bukan dari body/header client
     const result = await posService.checkout(
       {
         paymentMethod,
@@ -51,9 +45,10 @@ export async function POST(req: Request) {
         items,
       },
       {
-        id: userIdHeader,
-        name: userNameHeader,
-        role: roleHeader,
+        id: auth.id,
+        name: auth.name,
+        email: auth.email,
+        role: auth.role,
       }
     );
 

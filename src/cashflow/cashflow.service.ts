@@ -117,6 +117,7 @@ export class CashflowService {
         sourceType: dto.type,
         status: 'DRAFT', // Otomatis masuk ke Draf Jurnal Umum!
         total: dto.nominal,
+        createdBy: user.id,
         lines: {
           create: [
             { accountCode: debitAccountCode, side: 'DEBIT', nominal: dto.nominal },
@@ -142,7 +143,7 @@ export class CashflowService {
     });
   }
 
-  async approve(id: string, user: { role: string } = { role: 'OWNER' }) {
+  async approve(id: string, user: { id?: string; role: string }) {
     if (user.role !== Role.OWNER) {
       throw new ForbiddenException('Hanya OWNER yang berhak menyetujui transaksi.');
     }
@@ -150,17 +151,27 @@ export class CashflowService {
     if (!entry) throw new NotFoundException('Transaksi tidak ditemukan.');
     return this.prisma.journalEntry.update({
       where: { id },
-      data: { status: 'POSTED' },
+      data: {
+        status: 'POSTED',
+        approvedBy: user.id || null,
+        approvedAt: new Date(),
+      },
     });
   }
 
-  async reject(id: string, user: { role: string } = { role: 'OWNER' }) {
+  async reject(id: string, user: { id?: string; role: string }) {
     if (user.role !== Role.OWNER) {
       throw new ForbiddenException('Hanya OWNER yang berhak menolak transaksi.');
     }
     const entry = await this.prisma.journalEntry.findUnique({ where: { id } });
     if (!entry) throw new NotFoundException('Transaksi tidak ditemukan.');
-    await this.prisma.journalLine.deleteMany({ where: { entryId: id } });
-    return this.prisma.journalEntry.delete({ where: { id } });
+    return this.prisma.journalEntry.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        approvedBy: user.id || null,
+        approvedAt: new Date(),
+      },
+    });
   }
 }

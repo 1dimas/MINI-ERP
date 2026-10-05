@@ -62,7 +62,7 @@ async function test() {
   const balanceAfterDraft = await service.getAccountPostedBalance('110');
   console.log('Saldo Kas (Saat DRAFT):', balanceAfterDraft, '| (Wajib Tidak Berkurang)');
 
-  const approvedEntry = await service.approve(draftEntry.id);
+  const approvedEntry = await service.approve(draftEntry.id, { role: 'OWNER' });
   console.log('Status Setelah Approved Owner:', approvedEntry.status);
 
   const balanceAfterApproved = await service.getAccountPostedBalance('110');
@@ -80,7 +80,7 @@ async function test() {
     { id: 'user-fin', role: 'FINANCE' }
   );
 
-  const resultRejected = await service.reject(rejectedDraft.id);
+  const resultRejected = await service.reject(rejectedDraft.id, { role: 'OWNER' });
   console.log('Status Setelah Rejected Owner:', resultRejected.status);
 
   const balanceAfterRejected = await service.getAccountPostedBalance('110');

@@ -24,6 +24,9 @@ import {
   RotateCcw,
   Ban,
   Loader2,
+  Activity,
+  XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Table,
@@ -34,6 +37,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -44,6 +48,10 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState<boolean>(false);
   const [posTransactions, setPosTransactions] = useState<any[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState<boolean>(false);
+  const [shiftWarnings, setShiftWarnings] = useState<any[]>([]);
+  const [loadingWarnings, setLoadingWarnings] = useState<boolean>(false);
+  const [healthReport, setHealthReport] = useState<any>(null);
+  const [loadingHealth, setLoadingHealth] = useState<boolean>(false);
   const [isVoiding, setIsVoiding] = useState<string | null>(null);
   const [voidFeedback, setVoidFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -67,12 +75,44 @@ export default function DashboardPage() {
 
         if (parsedUser.role === 'OWNER') {
           fetchTransactions(parsedUser);
+          fetchShiftWarnings();
+          fetchSystemHealth();
         }
       } catch (e) {
         setUser(null);
       }
     }
   }, [router]);
+
+  const fetchSystemHealth = async () => {
+    setLoadingHealth(true);
+    try {
+      const res = await fetch('/api/system/health');
+      if (res.ok) {
+        const data = await res.json();
+        setHealthReport(data);
+      }
+    } catch (err) {
+      console.error('Failed to load system health report:', err);
+    } finally {
+      setLoadingHealth(false);
+    }
+  };
+
+  const fetchShiftWarnings = async () => {
+    setLoadingWarnings(true);
+    try {
+      const res = await fetch('/api/shift/warnings');
+      if (res.ok) {
+        const data = await res.json();
+        setShiftWarnings(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to load shift warnings:', err);
+    } finally {
+      setLoadingWarnings(false);
+    }
+  };
 
   const fetchTransactions = async (currentUser?: any) => {
     setLoadingTransactions(true);
@@ -222,6 +262,33 @@ export default function DashboardPage() {
             </div>
           </div>
         </header>
+
+        {/* PERINGATAN SHIFT KASIR GANTUNG (> 14 JAM) KHUSUS OWNER */}
+        {user.role === 'OWNER' && shiftWarnings.length > 0 && (
+          <Alert
+            variant="destructive"
+            className="border-red-600 bg-red-950/90 text-white shadow-2xl"
+          >
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+            <div>
+              <AlertTitle className="text-sm font-bold text-red-100 flex items-center gap-2">
+                ⚠️ PERINGATAN KASIR: {shiftWarnings.length} Shift Belum Ditutup Lebih Dari 14 Jam!
+              </AlertTitle>
+              <AlertDescription className="text-xs text-red-200 mt-1">
+                Ada {shiftWarnings.length} shift kasir yang belum ditutup lebih dari 14 jam! Segera perintahkan{' '}
+                <span className="font-bold underline text-white">
+                  {shiftWarnings
+                    .map(
+                      (w: any) =>
+                        `${w.user?.name || 'Kasir'} (Aktif ${w.elapsedHours} jam)`
+                    )
+                    .join(', ')}
+                </span>{' '}
+                untuk melakukan tutup shift (Cash Settlement) agar fisik kas laci tidak terbawa ke shift berikutnya.
+              </AlertDescription>
+            </div>
+          </Alert>
+        )}
 
         {/* DASHBOARD SPESIFIK UNTUK ROLE KASIR */}
         {user.role === 'KASIR' && (
@@ -411,15 +478,135 @@ export default function DashboardPage() {
         {/* DASHBOARD SPESIFIK UNTUK ROLE OWNER */}
         {user.role === 'OWNER' && (
           <div className="space-y-6">
-            <div className="border-b border-neutral-800 pb-3">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-amber-400" />
-                Executive Dashboard & Checker Portal (Owner)
-              </h2>
-              <p className="text-xs text-neutral-400">
-                Hak akses tertinggi: Otorisasi Audit Jurnal, Pengawasan Keuangan Toko, dan Keamanan Sistem.
-              </p>
+            <div className="border-b border-neutral-800 pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-amber-400" />
+                  Executive Dashboard & Checker Portal (Owner)
+                </h2>
+                <p className="text-xs text-neutral-400">
+                  Hak akses tertinggi: Otorisasi Audit Jurnal, Pengawasan Keuangan Toko, dan Keamanan Sistem.
+                </p>
+              </div>
+
+              {healthReport && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-3 py-1 text-xs font-mono font-bold rounded-full border flex items-center gap-1.5 ${
+                      healthReport.isAllHealthy
+                        ? 'border-emerald-600 bg-emerald-950/60 text-emerald-400'
+                        : 'border-red-600 bg-red-950/80 text-red-300 animate-pulse'
+                    }`}
+                  >
+                    {healthReport.isAllHealthy ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        100% HEALTHY
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-3.5 h-3.5 text-red-400 animate-pulse" />
+                        ANOMALI TERDETEKSI
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
+
+            {/* WIDGET DIAGNOSTIK KESEHATAN SISTEM (HEALTH CHECK) */}
+            <Card
+              className={`bg-neutral-950 transition-all duration-300 ${
+                healthReport && !healthReport.isAllHealthy
+                  ? 'border-red-700/80 shadow-[0_0_25px_rgba(239,68,68,0.15)]'
+                  : 'border-neutral-800'
+              }`}
+            >
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <div className="space-y-1">
+                  <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-emerald-400" />
+                    Status Kesehatan Sistem (Real-Time Diagnostic)
+                  </CardTitle>
+                  <CardDescription className="text-xs text-neutral-400">
+                    Pemeriksaan integritas otomatis: HPP Fisik vs Buku Besar, Keseimbangan Jurnal, Transaksi POS, dan Kelancaran QC.
+                  </CardDescription>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchSystemHealth}
+                  disabled={loadingHealth}
+                  className="h-8 border-neutral-800 bg-black text-neutral-300 hover:text-white hover:bg-neutral-900 text-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loadingHealth ? 'animate-spin' : ''}`} />
+                  {loadingHealth ? 'Memindai...' : 'Scan Ulang'}
+                </Button>
+              </CardHeader>
+
+              <CardContent className="pt-2">
+                {loadingHealth && !healthReport ? (
+                  <div className="flex items-center justify-center py-6 text-xs text-neutral-400 font-mono gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                    Menjalankan query diagnostik sistem secara paralel...
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {healthReport?.checks?.map((check: any) => {
+                      const isHealthy = check.status === 'HEALTHY';
+                      return (
+                        <div
+                          key={check.id}
+                          className={`p-3.5 rounded-lg border transition-all ${
+                            isHealthy
+                              ? 'border-neutral-900 bg-neutral-950/50'
+                              : 'border-red-800/80 bg-red-950/30 animate-pulse shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className="mt-0.5 shrink-0">
+                              {isHealthy ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-red-400 animate-pulse" />
+                              )}
+                            </div>
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <p
+                                  className={`text-xs font-semibold tracking-tight ${
+                                    isHealthy ? 'text-neutral-300' : 'text-red-300 font-bold'
+                                  }`}
+                                >
+                                  {check.indicator}
+                                </p>
+                                <span
+                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border font-bold ${
+                                    isHealthy
+                                      ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
+                                      : 'border-red-700 bg-red-950 text-red-300 animate-pulse'
+                                  }`}
+                                >
+                                  {check.status}
+                                </span>
+                              </div>
+                              <p
+                                className={`text-[11px] leading-relaxed ${
+                                  isHealthy ? 'text-neutral-500' : 'text-red-200 font-semibold'
+                                }`}
+                              >
+                                {check.message}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="border-yellow-900/80 bg-neutral-950">

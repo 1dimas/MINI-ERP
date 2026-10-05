@@ -7,15 +7,15 @@ const shiftService = new ShiftService(prisma as any);
 
 export async function GET(req: Request) {
   try {
-    const auth = requireAuth(req, ['KASIR', 'OWNER']);
+    const auth = requireAuth(req, ['OWNER']);
     if (auth instanceof NextResponse) return auth;
 
-    const result = await shiftService.getCurrentShift(auth.id);
-    return NextResponse.json(result);
+    const warnings = await shiftService.getOverdueShiftWarnings({ role: auth.role });
+    return NextResponse.json(warnings);
   } catch (error: any) {
-    const status = error.status || (error.getStatus ? error.getStatus() : 400);
+    const status = error.status || (error.getStatus ? error.getStatus() : 500);
     return NextResponse.json(
-      { message: error.message || 'Gagal memuat status shift aktif' },
+      { message: error.message || 'Gagal memuat data peringatan shift' },
       { status }
     );
   }

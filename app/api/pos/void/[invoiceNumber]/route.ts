@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 import { PosService } from '@/src/pos/pos.service';
 
 const posService = new PosService(prisma as any);
@@ -9,26 +10,15 @@ export async function POST(
   { params }: { params: Promise<{ invoiceNumber: string }> }
 ) {
   try {
-    const roleHeader = (req.headers.get('x-user-role') || '') as string;
-    const userIdHeader = req.headers.get('x-user-id') || 'owner-id';
-    const userNameHeader = req.headers.get('x-user-name') || 'Dimas Owner';
-
-    // Otorisasi ketat: HANYA OWNER
-    if (roleHeader !== 'OWNER') {
-      return NextResponse.json(
-        {
-          message:
-            'Akses ditolak. Hanya role OWNER yang memiliki hak akses untuk membatalkan (VOID) transaksi kasir.',
-        },
-        { status: 403 }
-      );
-    }
+    // Otorisasi ketat: HANYA OWNER yang boleh membatalkan (VOID) transaksi kasir
+    const auth = requireAuth(req, ['OWNER']);
+    if (auth instanceof NextResponse) return auth;
 
     const { invoiceNumber } = await params;
     const result = await posService.voidTransaction(invoiceNumber, {
-      id: userIdHeader,
-      name: userNameHeader,
-      role: roleHeader,
+      id: auth.id,
+      name: auth.name,
+      role: auth.role,
     });
 
     return NextResponse.json(result);
