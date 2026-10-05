@@ -47,9 +47,9 @@ async function test() {
       },
       { id: 'user-fin', role: 'FINANCE' }
     );
-    console.log('❌ FAIL: Harus menolak jurnal tidak seimbang!');
+    console.log('[FAIL] FAIL: Harus menolak jurnal tidak seimbang!');
   } catch (err: any) {
-    console.log('✅ PASS:', err.message);
+    console.log('[PASS] PASS:', err.message);
   }
 
   console.log('\n--- TEST 4: AUDIT APPROVE OLEH OWNER (DRAFT -> POSTED) ---');

@@ -303,7 +303,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Data Seed Berhasil: 1 Katalog Induk ThinkPad T14 kini memiliki 3 Unit Fisik (SN-001, SN-002, SN-003)!');
+  console.log('[SUCCESS] Data Seed Berhasil: 1 Katalog Induk ThinkPad T14 kini memiliki 3 Unit Fisik (SN-001, SN-002, SN-003)!');
 }
 
 main()

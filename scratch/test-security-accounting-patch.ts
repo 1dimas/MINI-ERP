@@ -8,7 +8,7 @@ const posService = new PosService(prisma as any);
 const journalService = new JournalService(prisma as any);
 
 async function testSecurityAndAccountingPatch() {
-  console.log('🚀 === STARTING VERIFICATION: SECURITY & ACCOUNTING PATCH ===\n');
+  console.log('[START] === STARTING VERIFICATION: SECURITY & ACCOUNTING PATCH ===\n');
 
   // Bersihkan data lama jika ada
   await prisma.posTransaction.deleteMany({
@@ -70,7 +70,7 @@ async function testSecurityAndAccountingPatch() {
     { id: testKasirId, name: 'Kasir Uji', role: 'KASIR' }
   );
 
-  console.log(`✅ Invoice 1 Number: ${resCash.invoice.invoiceNumber}`);
+  console.log(`[PASS] Invoice 1 Number: ${resCash.invoice.invoiceNumber}`);
   if (!resCash.invoice.invoiceNumber.startsWith('INV-')) {
     throw new Error('Format nomor invoice tidak valid!');
   }
@@ -81,7 +81,7 @@ async function testSecurityAndAccountingPatch() {
     include: { lines: true },
   });
   const cashDebitLine = jCash?.lines.find((l) => l.side === 'DEBIT' && Number(l.nominal) === 5000000);
-  console.log(`✅ Jurnal Penjualan CASH DEBIT Akun: ${cashDebitLine?.accountCode} (Harus 110 - Kas Toko)`);
+  console.log(`[PASS] Jurnal Penjualan CASH DEBIT Akun: ${cashDebitLine?.accountCode} (Harus 110 - Kas Toko)`);
   if (cashDebitLine?.accountCode !== '110') {
     throw new Error(`Expected DEBIT akun 110, got ${cashDebitLine?.accountCode}`);
   }
@@ -97,12 +97,12 @@ async function testSecurityAndAccountingPatch() {
     { id: testKasirId, name: 'Kasir Uji', role: 'KASIR' }
   );
 
-  console.log(`✅ Invoice 2 Number: ${resTrf.invoice.invoiceNumber}`);
+  console.log(`[PASS] Invoice 2 Number: ${resTrf.invoice.invoiceNumber}`);
 
   // Cek urutan invoice
   const seq1 = parseInt(resCash.invoice.invoiceNumber.split('-').pop()!, 10);
   const seq2 = parseInt(resTrf.invoice.invoiceNumber.split('-').pop()!, 10);
-  console.log(`✅ Urutan Invoice: ${seq1} -> ${seq2} (Harus berurutan persis +1)`);
+  console.log(`[PASS] Urutan Invoice: ${seq1} -> ${seq2} (Harus berurutan persis +1)`);
   if (seq2 !== seq1 + 1) {
     throw new Error(`Sequence invoice tidak bertambah urut! seq1=${seq1}, seq2=${seq2}`);
   }
@@ -113,7 +113,7 @@ async function testSecurityAndAccountingPatch() {
     include: { lines: true },
   });
   const trfDebitLine = jTrf?.lines.find((l) => l.side === 'DEBIT' && Number(l.nominal) === 7500000);
-  console.log(`✅ Jurnal Penjualan TRANSFER DEBIT Akun: ${trfDebitLine?.accountCode} (Harus 120 - Bank BCA)`);
+  console.log(`[PASS] Jurnal Penjualan TRANSFER DEBIT Akun: ${trfDebitLine?.accountCode} (Harus 120 - Bank BCA)`);
   if (trfDebitLine?.accountCode !== '120') {
     throw new Error(`Expected DEBIT akun 120, got ${trfDebitLine?.accountCode}`);
   }
@@ -133,7 +133,7 @@ async function testSecurityAndAccountingPatch() {
   const trfCreditVoidLine = reversalJournalTrf?.lines.find(
     (l) => l.side === 'KREDIT' && Number(l.nominal) === 7500000
   );
-  console.log(`✅ Jurnal Pembalik VOID TRANSFER KREDIT Akun: ${trfCreditVoidLine?.accountCode} (Harus 120 - Bank BCA)`);
+  console.log(`[PASS] Jurnal Pembalik VOID TRANSFER KREDIT Akun: ${trfCreditVoidLine?.accountCode} (Harus 120 - Bank BCA)`);
   if (trfCreditVoidLine?.accountCode !== '120') {
     throw new Error(`Expected KREDIT akun 120 pada saat VOID transfer, got ${trfCreditVoidLine?.accountCode}`);
   }
@@ -146,9 +146,9 @@ async function testSecurityAndAccountingPatch() {
       { keterangan: 'Mencoba manipulasi jurnal POS otomatis' },
       { id: 'fin-id', role: 'FINANCE' }
     );
-    throw new Error('❌ GAGAL: Jurnal sistem berhasil diedit manual!');
+    throw new Error('[FAIL] GAGAL: Jurnal sistem berhasil diedit manual!');
   } catch (err: any) {
-    console.log(`✅ SUCCESS: Edit jurnal sistem dicekal! Pesan: "${err.message}"`);
+    console.log(`[PASS] SUCCESS: Edit jurnal sistem dicekal! Pesan: "${err.message}"`);
   }
 
   // Cleanup
@@ -159,12 +159,12 @@ async function testSecurityAndAccountingPatch() {
     where: { serialNumber: { in: ['TEST-SN-CASH-01', 'TEST-SN-TRF-02'] } },
   });
 
-  console.log('\n🎉 === ALL VERIFICATION TESTS PASSED 100% PERFECTLY! ===\n');
+  console.log('\n[COMPLETE] === ALL VERIFICATION TESTS PASSED 100% PERFECTLY! ===\n');
 }
 
 testSecurityAndAccountingPatch()
   .catch((e) => {
-    console.error('❌ Verification failed:', e);
+    console.error('[FAIL] Verification failed:', e);
     process.exit(1);
   })
   .finally(async () => {

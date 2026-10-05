@@ -272,7 +272,7 @@ export default function DashboardPage() {
             <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
             <div>
               <AlertTitle className="text-sm font-bold text-red-100 flex items-center gap-2">
-                ⚠️ PERINGATAN KASIR: {shiftWarnings.length} Shift Belum Ditutup Lebih Dari 14 Jam!
+                PERINGATAN KASIR: {shiftWarnings.length} Shift Belum Ditutup Lebih Dari 14 Jam!
               </AlertTitle>
               <AlertDescription className="text-xs text-red-200 mt-1">
                 Ada {shiftWarnings.length} shift kasir yang belum ditutup lebih dari 14 jam! Segera perintahkan{' '}

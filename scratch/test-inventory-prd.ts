@@ -42,8 +42,8 @@ async function runPrdVerification() {
     { id: 'fin-01', role: 'FINANCE', name: 'Siti Keuangan' }
   );
 
-  console.log(`   ✅ Unit Created ID: ${unitCreated.id}, Status: ${unitCreated.status}`);
-  console.log(`   ✅ Purchase Journal Status: ${unitCreated.purchaseJournal?.status} (DRAFT)`);
+  console.log(`   [PASS] Unit Created ID: ${unitCreated.id}, Status: ${unitCreated.status}`);
+  console.log(`   [PASS] Purchase Journal Status: ${unitCreated.purchaseJournal?.status} (DRAFT)`);
 
   // 2. TEST: Duplicate SN Rejection
   console.log('\n2. Testing Duplicate SN Rejection (Backend Validation Constraint)...');
@@ -59,9 +59,9 @@ async function runPrdVerification() {
       },
       { id: 'fin-01', role: 'FINANCE' }
     );
-    console.error('   ❌ ERROR: System failed to reject duplicate SN!');
+    console.error('   [FAIL] ERROR: System failed to reject duplicate SN!');
   } catch (err: any) {
-    console.log(`   ✅ SUCCESS: Rejection verified! Error message: "${err.message}"`);
+    console.log(`   [PASS] SUCCESS: Rejection verified! Error message: "${err.message}"`);
   }
 
   // 3. TEST: Kasir Status Protection (Cannot checkout QC_PENDING)
@@ -85,15 +85,15 @@ async function runPrdVerification() {
       { items: [testSn], amountPaid: 12000000, paymentMethod: PaymentMethod.CASH },
       { id: 'kasir-01', role: 'KASIR', name: 'Budi Kasir' }
     );
-    console.error('   ❌ ERROR: Kasir was able to checkout a QC_PENDING unit!');
+    console.error('   [FAIL] ERROR: Kasir was able to checkout a QC_PENDING unit!');
   } catch (err: any) {
-    console.log(`   ✅ SUCCESS: Kasir Checkout blocked! Error message: "${err.message}"`);
+    console.log(`   [PASS] SUCCESS: Kasir Checkout blocked! Error message: "${err.message}"`);
   }
 
   // 4. TEST: Owner Approval (Checker Phase)
   console.log('\n4. Testing Owner Approval (Checker Phase)...');
   const approvedUnit = await inventoryService.approveUnit(unitCreated.id, { id: 'owner-01', role: 'OWNER' });
-  console.log(`   ✅ Unit Approved by Owner! New Status: ${approvedUnit.status}`);
+  console.log(`   [PASS] Unit Approved by Owner! New Status: ${approvedUnit.status}`);
 
   // 5. TEST: Capitalization / Upgrade Phase (Flipping Scenario)
   console.log('\n5. Testing Value-Add Upgrade & Capitalization...');
@@ -107,7 +107,7 @@ async function runPrdVerification() {
       catatanFisik: 'Keyboard sudah diganti baru original. Unit 100% mulus siap jual.',
     }
   );
-  console.log(`   ✅ Unit Upgraded! New HPP: Rp ${upgradedUnit.hpp} (Initial 8M + 350K Upgrade)`);
+  console.log(`   [PASS] Unit Upgraded! New HPP: Rp ${upgradedUnit.hpp} (Initial 8M + 350K Upgrade)`);
 
   // 6. TEST: Successful Kasir POS Checkout with Strict HPP Auto-Journal
   console.log('\n6. Testing Successful POS Checkout for AVAILABLE Unit...');
@@ -115,7 +115,7 @@ async function runPrdVerification() {
     { items: [testSn], amountPaid: 12000000, paymentMethod: PaymentMethod.CASH },
     { id: 'kasir-01', role: 'KASIR', name: 'Budi Kasir' }
   );
-  console.log(`   ✅ ${checkoutResult.message}`);
+  console.log(`   [PASS] ${checkoutResult.message}`);
   console.log('\n=== ALL PRD INVENTORY TESTS PASSED PERFECTLY ===\n');
 }
 

@@ -26,6 +26,7 @@ import {
   Barcode,
   Trash2,
   CheckCircle2,
+  Check,
   AlertCircle,
   CreditCard,
   Banknote,
@@ -721,8 +722,8 @@ export default function PosPage() {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             <div className="bg-emerald-950/60 border-b border-emerald-900/60 p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 text-black flex items-center justify-center mx-auto mb-2 font-bold">
-                ✓
+              <div className="w-10 h-10 rounded-full bg-emerald-500 text-black flex items-center justify-center mx-auto mb-2">
+                <Check className="w-5 h-5 stroke-[3]" />
               </div>
               <h3 className="text-base font-bold text-emerald-200">Transaksi Berhasil!</h3>
               <p className="text-xs text-emerald-400 font-mono mt-0.5">
@@ -1073,8 +1074,8 @@ export default function PosPage() {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             <div className="bg-neutral-950 border-b border-neutral-800 p-5 text-center">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2 font-bold">
-                ✓
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2">
+                <Check className="w-5 h-5 stroke-[3]" />
               </div>
               <h3 className="text-base font-bold text-white">Shift Kasir Resmi Ditutup</h3>
               <p className="text-xs text-neutral-400 mt-0.5">

@@ -35,6 +35,11 @@ import {
   Store,
   Boxes,
   HelpCircle,
+  Package,
+  Briefcase,
+  ShoppingCart,
+  TrendingDown,
+  X,
 } from 'lucide-react';
 
 const MONTH_NAMES = [
@@ -488,7 +493,7 @@ function FinanceDashboardContent() {
               }}
               className="text-neutral-400 hover:text-white"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -849,25 +854,29 @@ function FinanceDashboardContent() {
 
               {[
                 { key: 'ALL', label: 'Semua Transaksi' },
-                { key: '110', label: '💵 110 Kas Toko' },
-                { key: '120', label: '🏦 120 Bank BCA' },
-                { key: '130', label: '📦 130 Persediaan' },
-                { key: '310', label: '💼 310 Modal' },
-                { key: '410', label: '🛒 410 Penjualan' },
-                { key: '5xx', label: '📉 5xx Beban Operasional' },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setLedgerAccountFilter(tab.key)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium transition cursor-pointer whitespace-nowrap ${
-                    ledgerAccountFilter === tab.key
-                      ? 'bg-white text-black font-bold shadow-sm'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800/80'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+                { key: '110', label: '110 Kas Toko', icon: Wallet },
+                { key: '120', label: '120 Bank BCA', icon: Building2 },
+                { key: '130', label: '130 Persediaan', icon: Package },
+                { key: '310', label: '310 Modal', icon: Briefcase },
+                { key: '410', label: '410 Penjualan', icon: ShoppingCart },
+                { key: '5xx', label: '5xx Beban Operasional', icon: TrendingDown },
+              ].map((tab) => {
+                const IconComp = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setLedgerAccountFilter(tab.key)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-medium transition cursor-pointer whitespace-nowrap ${
+                      ledgerAccountFilter === tab.key
+                        ? 'bg-white text-black font-bold shadow-sm'
+                        : 'text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800/80'
+                    }`}
+                  >
+                    {IconComp && <IconComp className="w-3.5 h-3.5 shrink-0" />}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Filter Status Jurnal & Ringkasan Cash In / Out */}
@@ -1137,7 +1146,7 @@ function FinanceDashboardContent() {
                   onClick={() => setShowCashflowModal(false)}
                   className="p-1 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white"
                 >
-                  ✕
+                  <X className="w-4 h-4" />
                 </button>
               </CardHeader>
               <CardContent>
@@ -1247,7 +1256,7 @@ function FinanceDashboardContent() {
                   onClick={() => setShowManualModal(false)}
                   className="p-1 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white"
                 >
-                  ✕
+                  <X className="w-4 h-4" />
                 </button>
               </CardHeader>
               <CardContent>

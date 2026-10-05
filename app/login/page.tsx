@@ -19,7 +19,7 @@ import {
   InputOTPSlot,
   InputOTPSeparator,
 } from '@/components/ui/input-otp';
-import { ShieldCheck, Lock, ArrowLeft, Loader2, KeyRound } from 'lucide-react';
+import { ShieldCheck, Lock, ArrowLeft, Loader2, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 function LoginFormContent() {
   const router = useRouter();
@@ -204,7 +204,7 @@ function LoginFormContent() {
             {/* Alert Error */}
             {error && (
               <div className="p-3 border border-red-900/60 bg-red-950/40 text-red-300 text-xs rounded-md leading-relaxed flex items-start gap-2 animate-in fade-in">
-                <span className="font-bold">•</span>
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
@@ -212,7 +212,7 @@ function LoginFormContent() {
             {/* Alert Info/Message */}
             {message && !error && (
               <div className="p-3 border border-neutral-800 bg-neutral-900 text-neutral-200 text-xs rounded-md leading-relaxed flex items-start gap-2 animate-in fade-in">
-                <span className="font-bold">✓</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <span>{message}</span>
               </div>
             )}

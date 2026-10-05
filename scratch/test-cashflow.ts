@@ -18,9 +18,9 @@ async function test() {
       },
       { id: 'user-fin', role: 'FINANCE' }
     );
-    console.log('❌ FAIL: Harus melempar BadRequestException Saldo Tidak Mencukupi!');
+    console.log('[FAIL] FAIL: Harus melempar BadRequestException Saldo Tidak Mencukupi!');
   } catch (err: any) {
-    console.log('✅ PASS:', err.message);
+    console.log('[PASS] PASS:', err.message);
   }
 
   console.log('\n--- TEST 2: PROTEKSI TANGGAL MUNDUR (> 24 JAM) ---');
@@ -37,9 +37,9 @@ async function test() {
       },
       { id: 'user-fin', role: 'FINANCE' }
     );
-    console.log('❌ FAIL: Harus menolak backdating > 24 jam untuk Finance!');
+    console.log('[FAIL] FAIL: Harus menolak backdating > 24 jam untuk Finance!');
   } catch (err: any) {
-    console.log('✅ PASS:', err.message);
+    console.log('[PASS] PASS:', err.message);
   }
 
   console.log('\n--- TEST 3: MAKER-CHECKER (FINANCE DRAFT -> OWNER APPROVE) ---');

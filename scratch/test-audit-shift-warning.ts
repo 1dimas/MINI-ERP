@@ -13,7 +13,7 @@ const inventoryService = new InventoryService(prisma as any);
 const posService = new PosService(prisma as any);
 
 async function testAuditAndShiftWarning() {
-  console.log('🚀 === STARTING VERIFICATION: AUDIT TRAIL & SHIFT WARNING ===\n');
+  console.log('[START] === STARTING VERIFICATION: AUDIT TRAIL & SHIFT WARNING ===\n');
 
   // 1. UJI AUDIT CASHFLOW (REJECT TANPA HAPUS DATA & JEJAK USER)
   console.log('--- TEST 1: Cashflow Reject Preserved & Audit Trail ---');
@@ -31,7 +31,7 @@ async function testAuditAndShiftWarning() {
     { id: dummyFinanceId, role: 'FINANCE' }
   );
 
-  console.log(`✅ Cashflow Draft dibuat dengan createdBy: ${cfDraft.createdBy}`);
+  console.log(`[PASS] Cashflow Draft dibuat dengan createdBy: ${cfDraft.createdBy}`);
   if (cfDraft.createdBy !== dummyFinanceId) {
     throw new Error(`Expected createdBy ${dummyFinanceId}, got ${cfDraft.createdBy}`);
   }
@@ -42,8 +42,8 @@ async function testAuditAndShiftWarning() {
     role: 'OWNER',
   });
 
-  console.log(`✅ Status setelah reject: ${cfRejected.status} (Harus REJECTED, bukan dihapus!)`);
-  console.log(`✅ Audit Penolak: approvedBy=${cfRejected.approvedBy}, approvedAt=${cfRejected.approvedAt}`);
+  console.log(`[PASS] Status setelah reject: ${cfRejected.status} (Harus REJECTED, bukan dihapus!)`);
+  console.log(`[PASS] Audit Penolak: approvedBy=${cfRejected.approvedBy}, approvedAt=${cfRejected.approvedAt}`);
   if (cfRejected.status !== 'REJECTED' || cfRejected.approvedBy !== dummyOwnerId || !cfRejected.approvedAt) {
     throw new Error('Audit trail reject cashflow tidak valid atau data terhapus!');
   }
@@ -51,9 +51,9 @@ async function testAuditAndShiftWarning() {
   // Verifikasi record masih ada di database
   const stillInDb = await prisma.journalEntry.findUnique({ where: { id: cfDraft.id } });
   if (!stillInDb) {
-    throw new Error('❌ FATAL: Record cashflow terhapus dari database setelah reject!');
+    throw new Error('[FAIL] FATAL: Record cashflow terhapus dari database setelah reject!');
   }
-  console.log('✅ Verifikasi database: Record cashflow tetap ada di DB (Data tidak menguap).');
+  console.log('[PASS] Verifikasi database: Record cashflow tetap ada di DB (Data tidak menguap).');
 
   // 2. UJI AUDIT INVENTORY (RESTOCK MAKER-CHECKER)
   console.log('\n--- TEST 2: Inventory Maker-Checker Audit Trail ---');
@@ -78,8 +78,8 @@ async function testAuditAndShiftWarning() {
     { id: dummyFinanceId, role: 'FINANCE', name: 'Finance Audit' }
   );
 
-  console.log(`✅ ProductUnit createdBy: ${unitCreated.createdBy}`);
-  console.log(`✅ PurchaseJournal createdBy: ${unitCreated.purchaseJournal?.createdBy}`);
+  console.log(`[PASS] ProductUnit createdBy: ${unitCreated.createdBy}`);
+  console.log(`[PASS] PurchaseJournal createdBy: ${unitCreated.purchaseJournal?.createdBy}`);
   if (unitCreated.createdBy !== dummyFinanceId || unitCreated.purchaseJournal?.createdBy !== dummyFinanceId) {
     throw new Error('Audit createdBy pada inventory unit/jurnal tidak sesuai!');
   }
@@ -90,8 +90,8 @@ async function testAuditAndShiftWarning() {
     name: 'Owner Audit',
   });
 
-  console.log(`✅ ProductUnit approvedBy: ${unitApproved.approvedBy}, approvedAt: ${unitApproved.approvedAt}`);
-  console.log(`✅ PurchaseJournal approvedBy: ${unitApproved.purchaseJournal?.approvedBy}, approvedAt: ${unitApproved.purchaseJournal?.approvedAt}`);
+  console.log(`[PASS] ProductUnit approvedBy: ${unitApproved.approvedBy}, approvedAt: ${unitApproved.approvedAt}`);
+  console.log(`[PASS] PurchaseJournal approvedBy: ${unitApproved.purchaseJournal?.approvedBy}, approvedAt: ${unitApproved.purchaseJournal?.approvedAt}`);
   if (
     unitApproved.approvedBy !== dummyOwnerId ||
     !unitApproved.approvedAt ||
@@ -119,22 +119,22 @@ async function testAuditAndShiftWarning() {
   });
 
   const warnings = await shiftService.getOverdueShiftWarnings({ role: 'OWNER' });
-  console.log(`✅ Total shift gantung terdeteksi: ${warnings.length}`);
+  console.log(`[PASS] Total shift gantung terdeteksi: ${warnings.length}`);
   const targetWarning = warnings.find((w) => w.id === testOverdueShift.id);
   if (!targetWarning) {
     throw new Error('Shift 16 jam lalu gagal dideteksi oleh sistem peringatan!');
   }
 
-  console.log(`✅ Shift ID: ${targetWarning.id}`);
-  console.log(`✅ Kasir: ${targetWarning.user.name}`);
-  console.log(`✅ Durasi Gantung: ${targetWarning.elapsedHours} jam (>= 14 jam)`);
+  console.log(`[PASS] Shift ID: ${targetWarning.id}`);
+  console.log(`[PASS] Kasir: ${targetWarning.user.name}`);
+  console.log(`[PASS] Durasi Gantung: ${targetWarning.elapsedHours} jam (>= 14 jam)`);
 
   // Pastikan non-OWNER ditolak
   try {
     await shiftService.getOverdueShiftWarnings({ role: 'KASIR' });
-    throw new Error('❌ Akses non-OWNER seharusnya ditolak!');
+    throw new Error('[FAIL] Akses non-OWNER seharusnya ditolak!');
   } catch (err: any) {
-    console.log(`✅ Proteksi RBAC berhasil: Non-owner ditolak ("${err.message}")`);
+    console.log(`[PASS] Proteksi RBAC berhasil: Non-owner ditolak ("${err.message}")`);
   }
 
   // Cleanup
@@ -142,12 +142,12 @@ async function testAuditAndShiftWarning() {
   await prisma.journalEntry.delete({ where: { id: cfDraft.id } });
   await prisma.productUnit.delete({ where: { id: unitCreated.id } });
 
-  console.log('\n🎉 === ALL AUDIT TRAIL & SHIFT WARNING TESTS PASSED 100% PERFECTLY! ===\n');
+  console.log('\n[COMPLETE] === ALL AUDIT TRAIL & SHIFT WARNING TESTS PASSED 100% PERFECTLY! ===\n');
 }
 
 testAuditAndShiftWarning()
   .catch((e) => {
-    console.error('❌ Test failed:', e);
+    console.error('[FAIL] Test failed:', e);
     process.exit(1);
   })
   .finally(async () => {

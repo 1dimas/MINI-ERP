@@ -5,16 +5,16 @@ const prisma = new PrismaClient();
 const systemService = new SystemService(prisma as any);
 
 async function testSystemHealth() {
-  console.log('🚀 === STARTING VERIFICATION: SYSTEM HEALTH CHECK ===\n');
+  console.log('[START] === STARTING VERIFICATION: SYSTEM HEALTH CHECK ===\n');
 
   // 1. Jalankan Diagnostik Awal
   console.log('1. Menjalankan Diagnostik Kondisi Saat Ini...');
   const report1 = await systemService.getHealthCheck();
   console.log(`   Timestamp: ${report1.timestamp}`);
-  console.log(`   Overall Status: ${report1.isAllHealthy ? '🟢 ALL HEALTHY (100%)' : '🔴 ANOMALY DETECTED'}\n`);
+  console.log(`   Overall Status: ${report1.isAllHealthy ? '[HEALTHY] ALL HEALTHY (100%)' : '[UNHEALTHY] ANOMALY DETECTED'}\n`);
 
   for (const check of report1.checks) {
-    const icon = check.status === 'HEALTHY' ? '✅' : '❌';
+    const icon = check.status === 'HEALTHY' ? '[PASS]' : '[FAIL]';
     console.log(`   ${icon} [${check.status}] ${check.indicator}`);
     console.log(`      Pesan: ${check.message}`);
     if (check.details) {
@@ -45,7 +45,7 @@ async function testSystemHealth() {
   if (ghostCheck?.status !== 'ERROR' || reportWithGhost.isAllHealthy !== false) {
     throw new Error('Sistem gagal mendeteksi transaksi hantu!');
   }
-  console.log('   ✅ Sukses! Sistem langsung menangkap 1 transaksi kasir hantu.');
+  console.log('   [PASS] Sukses! Sistem langsung menangkap 1 transaksi kasir hantu.');
 
   // Cleanup Ghost Tx
   await prisma.posTransaction.delete({ where: { id: dummyGhostTx.id } });
@@ -81,7 +81,7 @@ async function testSystemHealth() {
   if (staleCheck?.status !== 'ERROR') {
     throw new Error('Sistem gagal mendeteksi unit tertahan di QC!');
   }
-  console.log('   ✅ Sukses! Sistem langsung mendeteksi unit yang tertahan di QC.');
+  console.log('   [PASS] Sukses! Sistem langsung mendeteksi unit yang tertahan di QC.');
 
   // Cleanup Stale Unit
   await prisma.productUnit.delete({ where: { id: staleUnit.id } });
@@ -89,14 +89,14 @@ async function testSystemHealth() {
   // 4. Verifikasi Akhir
   console.log('\n4. Verifikasi Pasca Cleanup (Harus Kembali Bersih)...');
   const finalReport = await systemService.getHealthCheck();
-  console.log(`   Overall Status: ${finalReport.isAllHealthy ? '🟢 ALL HEALTHY (100%)' : '🔴 ANOMALY DETECTED'}`);
+  console.log(`   Overall Status: ${finalReport.isAllHealthy ? '[HEALTHY] ALL HEALTHY (100%)' : '[UNHEALTHY] ANOMALY DETECTED'}`);
 
-  console.log('\n🎉 === ALL SYSTEM HEALTH DIAGNOSTIC TESTS PASSED 100% PERFECTLY! ===\n');
+  console.log('\n[COMPLETE] === ALL SYSTEM HEALTH DIAGNOSTIC TESTS PASSED 100% PERFECTLY! ===\n');
 }
 
 testSystemHealth()
   .catch((e) => {
-    console.error('❌ Diagnostic test failed:', e);
+    console.error('[FAIL] Diagnostic test failed:', e);
     process.exit(1);
   })
   .finally(async () => {
