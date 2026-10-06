@@ -33,6 +33,13 @@ export async function POST(req: Request) {
       );
     }
 
+    if (user.status === 'BANNED') {
+      return NextResponse.json(
+        { message: 'Akun Anda telah dinonaktifkan/dibekukan (BANNED). Silakan hubungi Owner.' },
+        { status: 403 }
+      );
+    }
+
     // ATURAN KRUSIAL: Jika isTwoFactorEnabled === true, kembalikan { requires2FA: true, userId: user.id }
     if (user.isTwoFactorEnabled) {
       return NextResponse.json({

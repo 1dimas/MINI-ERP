@@ -25,6 +25,13 @@ export async function POST(req: Request) {
       );
     }
 
+    if (user.status === 'BANNED') {
+      return NextResponse.json(
+        { message: 'Akun Anda telah dinonaktifkan/dibekukan (BANNED). Silakan hubungi Owner.' },
+        { status: 403 }
+      );
+    }
+
     if (!user.twoFactorSecret) {
       return NextResponse.json(
         { message: '2FA Secret belum dibuat untuk user ini' },

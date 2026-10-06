@@ -9,7 +9,12 @@ import { AUTH_HEADERS } from '@/lib/api-auth';
  * - register         : hanya berlaku untuk user pertama (dijaga di route)
  * - 2fa/verify       : langkah ke-2 login bagi user ber-2FA (belum punya JWT)
  */
-const PUBLIC_API_ROUTES = ['/api/auth/login', '/api/auth/register', '/api/auth/2fa/verify'];
+const PUBLIC_API_ROUTES = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/2fa/verify',
+  '/api/auth/status',
+];
 
 function extractToken(request: NextRequest): string | undefined {
   const authHeader = request.headers.get('authorization');
@@ -64,6 +69,35 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // ── PENCEGAHAN AKSES ILEGAL INSTAN: Tolak token user BANNED detik itu juga ──
+  if (payload?.sub) {
+    try {
+      const statusRes = await fetch(new URL(`/api/auth/status?id=${payload.sub}`, request.url), {
+        cache: 'no-store',
+      });
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        if (statusData.status === 'BANNED') {
+          if (isApi) {
+            return NextResponse.json(
+              { message: 'Unauthorized. Akun Anda telah dinonaktifkan/dibekukan (BANNED). Akses ditolak.' },
+              { status: 401 },
+            );
+          } else {
+            const loginUrl = new URL('/login', request.url);
+            loginUrl.searchParams.set('error', 'banned');
+            const response = NextResponse.redirect(loginUrl);
+            response.cookies.delete('access_token');
+            response.cookies.delete('token');
+            return response;
+          }
+        }
+      }
+    } catch {
+      // Fallback jika internal fetch mengalami network timeout
+    }
+  }
+
   const userRole = (payload.role || '').toUpperCase();
 
   // ATURAN ROLE-BASED ACCESS CONTROL (RBAC) HALAMAN:
@@ -93,13 +127,17 @@ export async function middleware(request: NextRequest) {
     }
 
     // 3. Role OWNER:
-    //    - Super Admin: Bebas melihat dan mengakses SELURUH modul (/dashboard, /inventory, /finance, /pos)
+    //    - Super Admin: Bebas melihat dan mengakses SELURUH modul (/dashboard, /inventory, /finance, /pos, /accounts)
+    if (pathname.startsWith('/accounts') && userRole !== 'OWNER') {
+      return NextResponse.redirect(new URL(userRole === 'KASIR' ? '/pos' : '/dashboard', request.url));
+    }
   }
 
   // Token & role valid: sematkan identitas ASLI dari JWT (bukan dari client)
   requestHeaders.set(AUTH_HEADERS.id, payload.sub);
   requestHeaders.set(AUTH_HEADERS.email, payload.email || '');
   requestHeaders.set(AUTH_HEADERS.role, userRole);
+  requestHeaders.set(AUTH_HEADERS.status, 'ACTIVE');
   // Header HTTP hanya boleh ASCII → encode nama (bisa mengandung karakter non-ASCII)
   requestHeaders.set(AUTH_HEADERS.name, encodeURIComponent(payload.name || payload.email || ''));
 
@@ -122,6 +160,10 @@ export const config = {
     '/inventory/:path*',
     '/finance',
     '/finance/:path*',
+    '/accounts',
+    '/accounts/:path*',
+    '/profile',
+    '/profile/:path*',
     '/2fa-setup',
     '/print/:path*',
   ],

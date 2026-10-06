@@ -7,6 +7,7 @@ import { CashflowModule } from './cashflow/cashflow.module';
 import { PosModule } from './pos/pos.module';
 import { ShiftModule } from './shift/shift.module';
 import { SystemModule } from './system/system.module';
+import { AccountModule } from './account/account.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SystemModule } from './system/system.module';
     PosModule,
     ShiftModule,
     SystemModule,
+    AccountModule,
   ],
 })
 export class AppModule {}

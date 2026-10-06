@@ -26,6 +26,7 @@ export const AUTH_HEADERS = {
   role: 'x-user-role',
   email: 'x-user-email',
   name: 'x-user-name',
+  status: 'x-user-status',
 } as const;
 
 function forbidden(message: string) {
@@ -46,6 +47,14 @@ export function requireAuth(
 ): AuthUser | NextResponse {
   const id = req.headers.get(AUTH_HEADERS.id);
   const role = (req.headers.get(AUTH_HEADERS.role) || '').toUpperCase() as AppRole;
+  const status = req.headers.get(AUTH_HEADERS.status) || 'ACTIVE';
+
+  if (status === 'BANNED') {
+    return NextResponse.json(
+      { message: 'Akun Anda telah dinonaktifkan/dibekukan (BANNED). Akses ditolak.' },
+      { status: 401 }
+    );
+  }
 
   if (!id || !role || !ALL_ROLES.includes(role)) {
     return forbidden('Akses ditolak. Identitas pengguna tidak valid.');

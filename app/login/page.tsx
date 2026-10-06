@@ -37,6 +37,8 @@ function LoginFormContent() {
   const [error, setError] = useState(
     sessionError === 'session_expired'
       ? 'Sesi Anda telah berakhir. Silakan login kembali.'
+      : sessionError === 'banned' || sessionError === 'account_banned'
+      ? 'Akses ditolak: Akun Anda telah dibekukan (BANNED). Silakan hubungi Owner.'
       : ''
   );
   const [message, setMessage] = useState('');

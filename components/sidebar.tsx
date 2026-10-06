@@ -23,6 +23,7 @@ import {
   BadgeCheck,
   FileText,
   BookOpen,
+  Users,
 } from 'lucide-react';
 
 interface SubNavItem {
@@ -132,6 +133,12 @@ export default function Sidebar() {
           href: '/2fa-setup',
           icon: ShieldCheck,
         },
+        {
+          type: 'link',
+          title: 'Profil & Kredensial',
+          href: '/profile',
+          icon: UserIcon,
+        },
       ];
     }
 
@@ -206,6 +213,12 @@ export default function Sidebar() {
           title: 'Keamanan Akun (2FA)',
           href: '/2fa-setup',
           icon: ShieldCheck,
+        },
+        {
+          type: 'link',
+          title: 'Profil & Kredensial',
+          href: '/profile',
+          icon: UserIcon,
         },
       ];
     }
@@ -290,9 +303,23 @@ export default function Sidebar() {
       },
       {
         type: 'link',
+        title: 'Manajemen Akun & SDM',
+        href: '/accounts',
+        icon: Users,
+        badge: 'SECURITY',
+        badgeColor: 'bg-amber-950 text-amber-300 border-amber-800',
+      },
+      {
+        type: 'link',
         title: 'Keamanan Akun (2FA)',
         href: '/2fa-setup',
         icon: ShieldCheck,
+      },
+      {
+        type: 'link',
+        title: 'Profil & Kredensial',
+        href: '/profile',
+        icon: UserIcon,
       },
     ];
   };

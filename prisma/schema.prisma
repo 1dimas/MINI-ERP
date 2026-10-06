@@ -9,13 +9,29 @@ datasource db {
 
 // --- MODUL AUTH & 2FA ---
 model User {
-  id                  String   @id @default(uuid())
-  email               String   @unique
+  id                  String          @id @default(uuid())
+  email               String          @unique
   name                String
   password            String   
-  role                String   @default("KASIR") // "OWNER", "FINANCE", "KASIR"
-  isTwoFactorEnabled  Boolean  @default(false)
+  role                String          @default("KASIR") // "OWNER", "FINANCE", "KASIR"
+  status              String          @default("ACTIVE") // "ACTIVE", "BANNED"
+  isTwoFactorEnabled  Boolean         @default(false)
   twoFactorSecret     String?  
+
+  receivedWarnings    WarningLetter[] @relation("ReceivedWarnings")
+  issuedWarnings      WarningLetter[] @relation("IssuedWarnings")
+}
+
+// --- MODUL SDM: SURAT PERINGATAN (WARNING LETTER) ---
+model WarningLetter {
+  id          String   @id @default(uuid())
+  userId      String   // ID Karyawan yang kena SP
+  reason      String   @db.Text
+  issuedById  String   // ID Owner yang memberi SP
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation("ReceivedWarnings", fields: [userId], references: [id], onDelete: Cascade)
+  issuedBy    User     @relation("IssuedWarnings", fields: [issuedById], references: [id], onDelete: Cascade)
 }
 
 // --- MODUL 1: BAGAN AKUN (COA) ---

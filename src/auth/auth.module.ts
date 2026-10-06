@@ -5,8 +5,11 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 
+import { PrismaModule } from '../prisma/prisma.module';
+
 @Module({
   imports: [
+    PrismaModule,
     JwtModule.register({
       // Fail-safe: tanpa fallback hardcoded. JWT_SECRET wajib ada di .env
       secret: process.env.JWT_SECRET,
