@@ -37,8 +37,12 @@ function LoginFormContent() {
   const [error, setError] = useState(
     sessionError === 'session_expired'
       ? 'Sesi Anda telah berakhir. Silakan login kembali.'
+      : sessionError === 'suspended'
+      ? 'Akses ditolak: Akun Anda sedang dinonaktifkan (SUSPENDED). Hubungi Owner untuk masa pemulihan (grace period).'
+      : sessionError === 'archived'
+      ? 'Akses ditolak: Akun Anda telah menjadi arsip mati (ARCHIVED). Akun tidak dapat digunakan lagi.'
       : sessionError === 'banned' || sessionError === 'account_banned'
-      ? 'Akses ditolak: Akun Anda telah dibekukan (BANNED). Silakan hubungi Owner.'
+      ? 'Akses ditolak: Akun Anda telah dibekukan. Silakan hubungi Owner.'
       : ''
   );
   const [message, setMessage] = useState('');

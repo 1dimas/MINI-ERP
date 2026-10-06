@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { prisma } from './prisma';
+import { hasPermission } from './permissions';
 
 /**
  * Identitas user untuk API Route.
@@ -36,10 +38,6 @@ function forbidden(message: string) {
 /**
  * Ambil user terautentikasi + validasi role.
  * Mengembalikan `AuthUser` jika lolos, atau `NextResponse` 403 jika ditolak.
- *
- * Pemakaian:
- *   const auth = requireAuth(req, ['OWNER']);
- *   if (auth instanceof NextResponse) return auth;
  */
 export function requireAuth(
   req: Request,
@@ -49,9 +47,9 @@ export function requireAuth(
   const role = (req.headers.get(AUTH_HEADERS.role) || '').toUpperCase() as AppRole;
   const status = req.headers.get(AUTH_HEADERS.status) || 'ACTIVE';
 
-  if (status === 'BANNED') {
+  if (status !== 'ACTIVE') {
     return NextResponse.json(
-      { message: 'Akun Anda telah dinonaktifkan/dibekukan (BANNED). Akses ditolak.' },
+      { message: `Akun Anda tidak aktif (${status}). Akses ditolak.` },
       { status: 401 }
     );
   }
@@ -76,4 +74,32 @@ export function requireAuth(
   }
 
   return { id, role, email, name: name || 'Pengguna' };
+}
+
+/**
+ * Validasi hak akses fitur dinamis (Granular Permission).
+ * Bebas koding ulang: cukup cek izin fitur yang diperlukan.
+ */
+export async function requirePermission(
+  req: Request,
+  requiredPermission: string,
+): Promise<AuthUser | NextResponse> {
+  const auth = requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
+
+  if (auth.role === 'OWNER') return auth;
+
+  const user = await prisma.user.findUnique({
+    where: { id: auth.id },
+    select: { role: true, permissions: true, status: true },
+  });
+
+  if (!user || user.status !== 'ACTIVE' || !hasPermission(user, requiredPermission)) {
+    return NextResponse.json(
+      { message: `Akses ditolak. Anda tidak memiliki izin untuk fitur: ${requiredPermission}` },
+      { status: 403 }
+    );
+  }
+
+  return auth;
 }

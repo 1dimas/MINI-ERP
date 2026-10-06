@@ -16,6 +16,7 @@ export async function GET(req: Request) {
         id: true,
         status: true,
         role: true,
+        suspendedAt: true,
       },
     });
 
@@ -23,10 +24,30 @@ export async function GET(req: Request) {
       return NextResponse.json({ status: 'NOT_FOUND', active: false }, { status: 404 });
     }
 
+    const userStatus = user.status || 'ACTIVE';
+
+    if (userStatus === 'SUSPENDED' && user.suspendedAt) {
+      const diffDays = Math.floor(
+        (Date.now() - new Date(user.suspendedAt).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (diffDays > 21) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { status: 'ARCHIVED' },
+        });
+        return NextResponse.json({
+          id: user.id,
+          status: 'ARCHIVED',
+          active: false,
+          role: user.role,
+        });
+      }
+    }
+
     return NextResponse.json({
       id: user.id,
-      status: user.status,
-      active: user.status === 'ACTIVE',
+      status: userStatus,
+      active: userStatus === 'ACTIVE',
       role: user.role,
     });
   } catch (error: any) {

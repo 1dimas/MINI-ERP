@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { Role } from '../../auth/enums/role.enum';
 
 export class CreateAccountDto {
@@ -18,4 +18,9 @@ export class CreateAccountDto {
   @IsNotEmpty({ message: 'Role karyawan wajib ditentukan' })
   @IsEnum(Role, { message: 'Role harus salah satu dari: OWNER, FINANCE, KASIR' })
   role: Role;
+
+  @IsOptional()
+  @IsArray({ message: 'Permissions harus berupa array string' })
+  @IsString({ each: true })
+  permissions?: string[];
 }

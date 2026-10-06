@@ -14,7 +14,9 @@ model User {
   name                String
   password            String   
   role                String          @default("KASIR") // "OWNER", "FINANCE", "KASIR"
-  status              String          @default("ACTIVE") // "ACTIVE", "BANNED"
+  status              String          @default("ACTIVE") // "ACTIVE", "SUSPENDED", "ARCHIVED"
+  suspendedAt         DateTime?
+  permissions         String[]        @default([]) // Dynamic Feature Flags / Hak Akses Fitur
   isTwoFactorEnabled  Boolean         @default(false)
   twoFactorSecret     String?  
 

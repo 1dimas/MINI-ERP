@@ -11,6 +11,8 @@ import { IssueSpDto } from './dto/issue-sp.dto';
 import { UpdateSelfDto } from './dto/update-self.dto';
 import * as bcrypt from 'bcrypt';
 
+import { getEffectivePermissions, ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions';
+
 @Injectable()
 export class AccountService {
   constructor(private readonly prisma: PrismaService) {}
@@ -28,6 +30,9 @@ export class AccountService {
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const initialPermissions = dto.permissions && dto.permissions.length > 0
+      ? dto.permissions
+      : (ROLE_DEFAULT_PERMISSIONS[dto.role] || []);
 
     const user = await this.prisma.user.create({
       data: {
@@ -36,21 +41,53 @@ export class AccountService {
         password: hashedPassword,
         role: dto.role,
         status: 'ACTIVE',
+        permissions: initialPermissions,
         isTwoFactorEnabled: false,
         twoFactorSecret: null,
       },
     });
 
     const { password, twoFactorSecret, ...cleanUser } = user;
-    return cleanUser;
+    return {
+      ...cleanUser,
+      effectivePermissions: getEffectivePermissions(cleanUser),
+    };
   }
 
   /**
-   * OWNER: Bekukan (BANNED) akun karyawan
+   * OWNER: Perbarui Hak Akses Fitur Karyawan (Tanpa Koding Ulang)
    */
-  async banAccount(id: string, currentUserId?: string) {
+  async updatePermissions(id: string, permissions: string[]) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('Karyawan tidak ditemukan');
+    }
+
+    if (user.role === 'OWNER') {
+      throw new BadRequestException('Role OWNER selalu memiliki akses ke seluruh fitur sistem');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: { permissions },
+    });
+
+    const { password, twoFactorSecret, ...cleanUser } = updatedUser;
+    return {
+      message: `Hak akses fitur untuk ${cleanUser.name} (${cleanUser.role}) berhasil diperbarui`,
+      user: {
+        ...cleanUser,
+        effectivePermissions: getEffectivePermissions(cleanUser),
+      },
+    };
+  }
+
+  /**
+   * OWNER: Nonaktifkan (SUSPEND) akun karyawan (Masa tenggang 3 minggu / 21 hari)
+   */
+  async suspendAccount(id: string, currentUserId?: string) {
     if (currentUserId && id === currentUserId) {
-      throw new BadRequestException('Anda tidak dapat membekukan (BANNED) akun Anda sendiri');
+      throw new BadRequestException('Anda tidak dapat menonaktifkan (SUSPEND) akun Anda sendiri');
     }
 
     const user = await this.prisma.user.findUnique({ where: { id } });
@@ -59,40 +96,96 @@ export class AccountService {
     }
 
     if (user.role === 'OWNER') {
-      throw new BadRequestException('Akun dengan role OWNER tidak dapat dibekukan');
+      throw new BadRequestException('Akun dengan role OWNER tidak dapat di-suspend');
     }
 
     const updatedUser = await this.prisma.user.update({
       where: { id },
-      data: { status: 'BANNED' },
+      data: {
+        status: 'SUSPENDED',
+        suspendedAt: new Date(),
+      },
     });
 
     const { password, twoFactorSecret, ...cleanUser } = updatedUser;
     return {
-      message: `Akun ${cleanUser.name} (${cleanUser.email}) berhasil dibekukan (BANNED)`,
+      message: `Akun ${cleanUser.name} (${cleanUser.email}) berhasil dinonaktifkan (SUSPENDED). Masa tenggang 3 minggu (21 hari) dimulai.`,
       user: cleanUser,
     };
   }
 
   /**
-   * OWNER: Aktifkan kembali akun yang dibekukan
+   * Alias kompatibilitas banAccount -> suspendAccount
    */
-  async activateAccount(id: string) {
+  async banAccount(id: string, currentUserId?: string) {
+    return this.suspendAccount(id, currentUserId);
+  }
+
+  /**
+   * OWNER: Pulihkan (RESTORE) akun dalam batas masa tenggang 3 minggu (21 hari)
+   */
+  async restoreAccount(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException('Karyawan tidak ditemukan');
     }
 
+    if (user.status !== 'SUSPENDED') {
+      if (user.status === 'ARCHIVED') {
+        throw new BadRequestException(
+          'Masa tenggang 3 minggu sudah habis. Akun ini sudah menjadi arsip mati (ARCHIVED) dan tidak bisa dipulihkan.',
+        );
+      }
+      throw new BadRequestException(`Hanya akun dengan status SUSPENDED yang dapat dipulihkan. Status saat ini: ${user.status}`);
+    }
+
+    if (!user.suspendedAt) {
+      const updatedUser = await this.prisma.user.update({
+        where: { id },
+        data: { status: 'ACTIVE', suspendedAt: null },
+      });
+      const { password, twoFactorSecret, ...cleanUser } = updatedUser;
+      return {
+        message: `Akun ${cleanUser.name} (${cleanUser.email}) berhasil dipulihkan (ACTIVE)`,
+        user: cleanUser,
+      };
+    }
+
+    const diffTime = Date.now() - new Date(user.suspendedAt).getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 21) {
+      // Lewat dari 3 minggu: kunci menjadi ARCHIVED permanen
+      await this.prisma.user.update({
+        where: { id },
+        data: { status: 'ARCHIVED' },
+      });
+      throw new BadRequestException(
+        `Masa tenggang 3 minggu sudah habis (${diffDays} hari sejak suspend). Akun ini sudah menjadi arsip mati (ARCHIVED) dan tidak bisa dipulihkan.`,
+      );
+    }
+
+    // Masih dalam batas <= 21 hari: pulihkan ke ACTIVE
     const updatedUser = await this.prisma.user.update({
       where: { id },
-      data: { status: 'ACTIVE' },
+      data: {
+        status: 'ACTIVE',
+        suspendedAt: null,
+      },
     });
 
     const { password, twoFactorSecret, ...cleanUser } = updatedUser;
     return {
-      message: `Akun ${cleanUser.name} (${cleanUser.email}) berhasil diaktifkan kembali (ACTIVE)`,
+      message: `Akun ${cleanUser.name} (${cleanUser.email}) berhasil dipulihkan (ACTIVE) dalam masa tenggang (${21 - diffDays} hari tersisa).`,
       user: cleanUser,
     };
+  }
+
+  /**
+   * Alias kompatibilitas activateAccount -> restoreAccount
+   */
+  async activateAccount(id: string) {
+    return this.restoreAccount(id);
   }
 
   /**
@@ -168,7 +261,7 @@ export class AccountService {
   }
 
   /**
-   * OWNER: Ambil seluruh daftar user beserta jumlah SP dan histori peringatannya
+   * OWNER: Ambil seluruh daftar user aktif & terkini beserta status grace period & SP
    */
   async getAccountList() {
     const users = await this.prisma.user.findMany({
@@ -179,6 +272,8 @@ export class AccountService {
         email: true,
         role: true,
         status: true,
+        suspendedAt: true,
+        permissions: true,
         isTwoFactorEnabled: true,
         _count: {
           select: {
@@ -203,11 +298,110 @@ export class AccountService {
       },
     });
 
-    return users.map((u) => ({
-      ...u,
-      warningCount: u._count.receivedWarnings,
-      isCriticalSp: u._count.receivedWarnings >= 3,
-    }));
+    return Promise.all(
+      users.map(async (u) => {
+        let currentStatus = u.status;
+        let daysSuspended = 0;
+        let remainingDays = 0;
+        let canRestore = false;
+
+        if (u.suspendedAt) {
+          const diffTime = Date.now() - new Date(u.suspendedAt).getTime();
+          daysSuspended = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          remainingDays = Math.max(0, 21 - daysSuspended);
+
+          // Otomatis ubah jadi ARCHIVED jika sudah lewat 21 hari
+          if (u.status === 'SUSPENDED' && daysSuspended > 21) {
+            currentStatus = 'ARCHIVED';
+            await this.prisma.user.update({
+              where: { id: u.id },
+              data: { status: 'ARCHIVED' },
+            });
+          }
+        }
+
+        canRestore = currentStatus === 'SUSPENDED' && remainingDays > 0;
+
+        return {
+          ...u,
+          status: currentStatus,
+          effectivePermissions: getEffectivePermissions(u),
+          warningCount: u._count.receivedWarnings,
+          isCriticalSp: u._count.receivedWarnings >= 3,
+          daysSuspended,
+          remainingDays,
+          canRestore,
+        };
+      }),
+    );
+  }
+
+  /**
+   * OWNER: Daftar riwayat mantan karyawan (Masa Tenggang & Arsip Mati)
+   */
+  async getHistoryAccounts() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        status: { in: ['SUSPENDED', 'ARCHIVED'] },
+      },
+      orderBy: { suspendedAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        suspendedAt: true,
+        permissions: true,
+        isTwoFactorEnabled: true,
+        _count: {
+          select: { receivedWarnings: true },
+        },
+        receivedWarnings: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            reason: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    return Promise.all(
+      users.map(async (u) => {
+        let currentStatus = u.status;
+        let daysSuspended = 0;
+        let remainingDays = 0;
+        let canRestore = false;
+
+        if (u.suspendedAt) {
+          const diffTime = Date.now() - new Date(u.suspendedAt).getTime();
+          daysSuspended = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          remainingDays = Math.max(0, 21 - daysSuspended);
+
+          if (u.status === 'SUSPENDED' && daysSuspended > 21) {
+            currentStatus = 'ARCHIVED';
+            await this.prisma.user.update({
+              where: { id: u.id },
+              data: { status: 'ARCHIVED' },
+            });
+          }
+        }
+
+        canRestore = currentStatus === 'SUSPENDED' && remainingDays > 0;
+
+        return {
+          ...u,
+          status: currentStatus,
+          effectivePermissions: getEffectivePermissions(u),
+          warningCount: u._count.receivedWarnings,
+          daysSuspended,
+          remainingDays,
+          canRestore,
+        };
+      }),
+    );
   }
 
   /**
@@ -275,6 +469,7 @@ export class AccountService {
         email: true,
         role: true,
         status: true,
+        permissions: true,
         isTwoFactorEnabled: true,
         _count: {
           select: {
@@ -303,6 +498,7 @@ export class AccountService {
 
     return {
       ...user,
+      effectivePermissions: getEffectivePermissions(user),
       warningCount: user._count.receivedWarnings,
     };
   }

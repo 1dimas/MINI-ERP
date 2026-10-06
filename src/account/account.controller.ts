@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { UpdatePermissionsDto } from './dto/update-permissions.dto';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 
 @Controller('account')
@@ -36,8 +37,20 @@ export class AccountController {
   }
 
   /**
-   * 2. PATCH /account/:id/ban
-   * Khusus OWNER: Membekukan akun karyawan
+   * 2. PATCH /account/:id/suspend
+   * Khusus OWNER: Nonaktifkan akun karyawan (Masa tenggang 3 minggu)
+   */
+  @Patch(':id/suspend')
+  @Roles(Role.OWNER)
+  async suspendAccount(
+    @Param('id') id: string,
+    @GetUser('sub') currentUserId: string,
+  ) {
+    return this.accountService.suspendAccount(id, currentUserId);
+  }
+
+  /**
+   * Alias: PATCH /account/:id/ban
    */
   @Patch(':id/ban')
   @Roles(Role.OWNER)
@@ -45,17 +58,36 @@ export class AccountController {
     @Param('id') id: string,
     @GetUser('sub') currentUserId: string,
   ) {
-    return this.accountService.banAccount(id, currentUserId);
+    return this.accountService.suspendAccount(id, currentUserId);
   }
 
   /**
-   * 3. PATCH /account/:id/activate
-   * Khusus OWNER: Mengaktifkan kembali akun karyawan
+   * 3. PATCH /account/:id/restore
+   * Khusus OWNER: Pulihkan akun karyawan dalam masa tenggang 3 minggu (21 hari)
+   */
+  @Patch(':id/restore')
+  @Roles(Role.OWNER)
+  async restoreAccount(@Param('id') id: string) {
+    return this.accountService.restoreAccount(id);
+  }
+
+  /**
+   * Alias: PATCH /account/:id/activate
    */
   @Patch(':id/activate')
   @Roles(Role.OWNER)
   async activateAccount(@Param('id') id: string) {
-    return this.accountService.activateAccount(id);
+    return this.accountService.restoreAccount(id);
+  }
+
+  /**
+   * 3b. GET /account/history
+   * Khusus OWNER: Daftar riwayat mantan karyawan (Masa Tenggang & Arsip Mati)
+   */
+  @Get('history')
+  @Roles(Role.OWNER)
+  async getHistoryAccounts() {
+    return this.accountService.getHistoryAccounts();
   }
 
   /**
@@ -66,6 +98,19 @@ export class AccountController {
   @Roles(Role.OWNER)
   async reset2Fa(@Param('id') id: string) {
     return this.accountService.reset2Fa(id);
+  }
+
+  /**
+   * 4b. PATCH /account/:id/permissions
+   * Khusus OWNER: Kelola Hak Akses Fitur Karyawan (Tanpa Koding Ulang)
+   */
+  @Patch(':id/permissions')
+  @Roles(Role.OWNER)
+  async updatePermissions(
+    @Param('id') id: string,
+    @Body() dto: UpdatePermissionsDto,
+  ) {
+    return this.accountService.updatePermissions(id, dto.permissions);
   }
 
   /**

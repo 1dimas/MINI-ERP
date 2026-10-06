@@ -69,8 +69,12 @@ export class AuthService {
       throw new UnauthorizedException('Email atau password salah');
     }
 
-    if (user.status === 'BANNED') {
-      throw new UnauthorizedException('Akun Anda telah dinonaktifkan/dibekukan (BANNED). Silakan hubungi Owner.');
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException(
+        user.status === 'SUSPENDED'
+          ? 'Akun Anda sedang dinonaktifkan (SUSPENDED). Silakan hubungi Owner untuk masa pemulihan (grace period).'
+          : 'Akun Anda telah diarsipkan permanen (ARCHIVED). Akses ditolak.',
+      );
     }
 
     // ATURAN KRUSIAL: Jika 2FA aktif, tahan token dan minta verifikasi 2FA terlebih dahulu
@@ -143,8 +147,12 @@ export class AuthService {
       throw new NotFoundException('User tidak ditemukan');
     }
 
-    if (user.status === 'BANNED') {
-      throw new UnauthorizedException('Akun Anda telah dinonaktifkan/dibekukan (BANNED). Silakan hubungi Owner.');
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException(
+        user.status === 'SUSPENDED'
+          ? 'Akun Anda sedang dinonaktifkan (SUSPENDED).'
+          : 'Akun Anda telah diarsipkan permanen (ARCHIVED). Akses ditolak.',
+      );
     }
 
     if (!user.twoFactorSecret) {

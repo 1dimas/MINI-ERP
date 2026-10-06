@@ -69,7 +69,7 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // ── PENCEGAHAN AKSES ILEGAL INSTAN: Tolak token user BANNED detik itu juga ──
+  // ── PENCEGAHAN AKSES ILEGAL INSTAN: Tolak token user SUSPENDED / ARCHIVED detik itu juga ──
   if (payload?.sub) {
     try {
       const statusRes = await fetch(new URL(`/api/auth/status?id=${payload.sub}`, request.url), {
@@ -77,15 +77,20 @@ export async function middleware(request: NextRequest) {
       });
       if (statusRes.ok) {
         const statusData = await statusRes.json();
-        if (statusData.status === 'BANNED') {
+        if (statusData.status === 'SUSPENDED' || statusData.status === 'ARCHIVED' || statusData.status === 'BANNED' || !statusData.active) {
           if (isApi) {
             return NextResponse.json(
-              { message: 'Unauthorized. Akun Anda telah dinonaktifkan/dibekukan (BANNED). Akses ditolak.' },
+              {
+                message:
+                  statusData.status === 'SUSPENDED'
+                    ? 'Unauthorized. Akun Anda sedang dinonaktifkan (SUSPENDED). Akses ditolak.'
+                    : 'Unauthorized. Akun Anda telah menjadi arsip mati (ARCHIVED). Akses ditolak.',
+              },
               { status: 401 },
             );
           } else {
             const loginUrl = new URL('/login', request.url);
-            loginUrl.searchParams.set('error', 'banned');
+            loginUrl.searchParams.set('error', statusData.status.toLowerCase());
             const response = NextResponse.redirect(loginUrl);
             response.cookies.delete('access_token');
             response.cookies.delete('token');

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'otplib';
 import { signJwt } from '@/lib/auth-token';
+import { getEffectivePermissions } from '@/lib/permissions';
 
 export async function POST(req: Request) {
   try {
@@ -25,9 +26,14 @@ export async function POST(req: Request) {
       );
     }
 
-    if (user.status === 'BANNED') {
+    if (user.status !== 'ACTIVE') {
       return NextResponse.json(
-        { message: 'Akun Anda telah dinonaktifkan/dibekukan (BANNED). Silakan hubungi Owner.' },
+        {
+          message:
+            user.status === 'SUSPENDED'
+              ? 'Akun Anda sedang dinonaktifkan (SUSPENDED).'
+              : 'Akun Anda telah diarsipkan permanen (ARCHIVED). Akses ditolak.',
+        },
         { status: 403 }
       );
     }
@@ -66,12 +72,16 @@ export async function POST(req: Request) {
       role: user.role,
     });
 
+    const effectivePermissions = getEffectivePermissions(user);
     const { password: _, twoFactorSecret: __, ...userClean } = user;
 
     const response = NextResponse.json({
       accessToken: token,
       access_token: token,
-      user: userClean,
+      user: {
+        ...userClean,
+        permissions: effectivePermissions,
+      },
     });
 
     // Simpan ke cookies via Next.js response cookies

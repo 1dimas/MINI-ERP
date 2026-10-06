@@ -46,8 +46,12 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Pengguna tidak ditemukan dalam sistem');
     }
 
-    if (user.status === 'BANNED') {
-      throw new UnauthorizedException('Akun telah dibekukan (BANNED). Akses ditolak.');
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException(
+        user.status === 'SUSPENDED'
+          ? 'Akun Anda sedang dinonaktifkan (SUSPENDED).'
+          : 'Akun Anda telah diarsipkan permanen (ARCHIVED). Akses ditolak.',
+      );
     }
 
     request.user = {

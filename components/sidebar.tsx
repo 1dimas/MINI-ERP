@@ -25,6 +25,7 @@ import {
   BookOpen,
   Users,
 } from 'lucide-react';
+import { hasPermission } from '@/lib/permissions';
 
 interface SubNavItem {
   title: string;
@@ -85,73 +86,24 @@ export default function Sidebar() {
   const currentRole = user?.role || 'KASIR';
 
   // Saring Navigasi Berdasarkan Role Asli (RBAC Murni Tanpa Simulasi)
+  // Saring Navigasi Berdasarkan Role & Hak Akses Fitur Dinamis
   const getNavEntries = (): NavEntry[] => {
-    // ==========================================
-    // 1. ROLE KASIR: POS & CEK STOK (READY/PENDING)
-    // ==========================================
-    if (currentRole === 'KASIR') {
+    // Role OWNER selalu melihat seluruh navigasi penuh
+    if (currentRole === 'OWNER') {
       return [
+        {
+          type: 'link',
+          title: 'Dashboard Utama',
+          href: '/dashboard',
+          icon: LayoutDashboard,
+        },
         {
           type: 'link',
           title: 'Terminal Kasir (POS)',
           href: '/pos',
           icon: Store,
-          badge: 'UTAMA',
+          badge: 'POS',
           badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800',
-        },
-        {
-          type: 'link',
-          title: 'Riwayat Transaksi',
-          href: '/pos?tab=history',
-          icon: Receipt,
-          badge: 'READ ONLY',
-          badgeColor: 'bg-neutral-800 text-neutral-300 border-neutral-700',
-        },
-        {
-          type: 'link',
-          title: 'Cek Ketersediaan Stok',
-          href: '/inventory',
-          icon: Laptop,
-          badge: 'STOK',
-          badgeColor: 'bg-blue-950 text-blue-300 border-blue-800',
-          subItems: [
-            {
-              title: 'Unit Siap Jual (Ready)',
-              href: '/inventory?status=AVAILABLE',
-              icon: CheckCircle2,
-            },
-            {
-              title: 'Pending QC / Masuk',
-              href: '/inventory?status=QC_PENDING',
-              icon: Clock,
-            },
-          ],
-        },
-        {
-          type: 'link',
-          title: 'Keamanan Akun (2FA)',
-          href: '/2fa-setup',
-          icon: ShieldCheck,
-        },
-        {
-          type: 'link',
-          title: 'Profil & Kredensial',
-          href: '/profile',
-          icon: UserIcon,
-        },
-      ];
-    }
-
-    // ==========================================
-    // 2. ROLE FINANCE: INVENTARIS + KEUANGAN
-    // ==========================================
-    if (currentRole === 'FINANCE') {
-      return [
-        {
-          type: 'link',
-          title: 'Dashboard Ringkasan',
-          href: '/dashboard',
-          icon: LayoutDashboard,
         },
         {
           type: 'group',
@@ -164,16 +116,21 @@ export default function Sidebar() {
               icon: Folder,
             },
             {
-              title: 'Kelola & Edit Stok Unit',
+              title: 'Manajemen Unit & Stok',
               href: '/inventory?tab=units',
               icon: Laptop,
+            },
+            {
+              title: 'QC & Approval Unit',
+              href: '/inventory?tab=qc',
+              icon: BadgeCheck,
+              badge: 'AUDIT',
+              badgeColor: 'bg-yellow-950 text-yellow-300 border-yellow-800',
             },
             {
               title: 'Riwayat Pembelian',
               href: '/inventory?tab=purchases',
               icon: Receipt,
-              badge: 'EDIT',
-              badgeColor: 'bg-amber-950 text-amber-300 border-amber-800',
             },
           ],
         },
@@ -199,7 +156,7 @@ export default function Sidebar() {
               href: '/finance?tab=neraca',
               icon: Scale,
               badge: 'LAPORAN',
-              badgeColor: 'bg-blue-950 text-blue-300 border-blue-800',
+              badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800',
             },
             {
               title: 'Arus Kas (Cashflow)',
@@ -207,6 +164,14 @@ export default function Sidebar() {
               icon: ArrowLeftRight,
             },
           ],
+        },
+        {
+          type: 'link',
+          title: 'Manajemen Akun & SDM',
+          href: '/accounts',
+          icon: Users,
+          badge: 'SECURITY',
+          badgeColor: 'bg-amber-950 text-amber-300 border-amber-800',
         },
         {
           type: 'link',
@@ -223,105 +188,196 @@ export default function Sidebar() {
       ];
     }
 
-    // ==========================================
-    // 3. ROLE OWNER: SUPER ADMIN (SEMUA AKSES)
-    // ==========================================
-    return [
-      {
+    // Role Karyawan Lain: Tampilkan modul secara DINAMIS berdasarkan hak akses fitur
+    const entries: NavEntry[] = [];
+
+    // 1. Dashboard Ringkasan
+    if (
+      currentRole === 'FINANCE' ||
+      hasPermission(user, 'ACCOUNT_MANAGE') ||
+      hasPermission(user, 'FINANCE_JOURNAL') ||
+      hasPermission(user, 'FINANCE_REPORT')
+    ) {
+      entries.push({
         type: 'link',
-        title: 'Dashboard Utama',
+        title: 'Dashboard Ringkasan',
         href: '/dashboard',
         icon: LayoutDashboard,
-      },
-      {
+      });
+    }
+
+    // 2. Terminal Kasir (POS)
+    if (hasPermission(user, 'POS_CHECKOUT')) {
+      entries.push({
         type: 'link',
         title: 'Terminal Kasir (POS)',
         href: '/pos',
         icon: Store,
-        badge: 'POS',
+        badge: 'UTAMA',
         badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800',
-      },
-      {
-        type: 'group',
-        title: 'INVENTARIS & BARANG',
-        icon: Boxes,
-        items: [
+      });
+    }
+
+    // 3. Riwayat Transaksi (Khusus jika memiliki izin riwayat transaksi)
+    if (hasPermission(user, 'POS_HISTORY') && !hasPermission(user, 'FINANCE_JOURNAL')) {
+      entries.push({
+        type: 'link',
+        title: 'Riwayat Transaksi',
+        href: '/pos?tab=history',
+        icon: Receipt,
+        badge: 'READ ONLY',
+        badgeColor: 'bg-neutral-800 text-neutral-300 border-neutral-700',
+      });
+    }
+
+    // 4. Modul Inventaris & Stok
+    const canViewInv = hasPermission(user, 'INVENTORY_VIEW');
+    const canManageInv = hasPermission(user, 'INVENTORY_MANAGE');
+    const canQcInv = hasPermission(user, 'INVENTORY_QC');
+    const canPurchaseInv = hasPermission(user, 'INVENTORY_PURCHASE');
+
+    if (canManageInv || canQcInv || canPurchaseInv) {
+      const invItems: SubNavItem[] = [];
+      if (canManageInv) {
+        invItems.push({
+          title: 'Katalog & Data Barang',
+          href: '/inventory?tab=models',
+          icon: Folder,
+        });
+        invItems.push({
+          title: 'Manajemen Unit & Stok',
+          href: '/inventory?tab=units',
+          icon: Laptop,
+        });
+      }
+      if (canQcInv) {
+        invItems.push({
+          title: 'QC & Approval Unit',
+          href: '/inventory?tab=qc',
+          icon: BadgeCheck,
+          badge: 'AUDIT',
+          badgeColor: 'bg-yellow-950 text-yellow-300 border-yellow-800',
+        });
+      }
+      if (canPurchaseInv) {
+        invItems.push({
+          title: 'Riwayat Pembelian',
+          href: '/inventory?tab=purchases',
+          icon: Receipt,
+          badge: 'EDIT',
+          badgeColor: 'bg-amber-950 text-amber-300 border-amber-800',
+        });
+      }
+
+      if (invItems.length > 0) {
+        entries.push({
+          type: 'group',
+          title: 'INVENTARIS & BARANG',
+          icon: Boxes,
+          items: invItems,
+        });
+      }
+    } else if (canViewInv) {
+      entries.push({
+        type: 'link',
+        title: 'Cek Ketersediaan Stok',
+        href: '/inventory',
+        icon: Laptop,
+        badge: 'STOK',
+        badgeColor: 'bg-blue-950 text-blue-300 border-blue-800',
+        subItems: [
           {
-            title: 'Katalog & Data Barang',
-            href: '/inventory?tab=models',
-            icon: Folder,
+            title: 'Unit Siap Jual (Ready)',
+            href: '/inventory?status=AVAILABLE',
+            icon: CheckCircle2,
           },
           {
-            title: 'Manajemen Unit & Stok',
-            href: '/inventory?tab=units',
-            icon: Laptop,
-          },
-          {
-            title: 'QC & Approval Unit',
-            href: '/inventory?tab=qc',
-            icon: BadgeCheck,
-            badge: 'AUDIT',
-            badgeColor: 'bg-yellow-950 text-yellow-300 border-yellow-800',
-          },
-          {
-            title: 'Riwayat Pembelian',
-            href: '/inventory?tab=purchases',
-            icon: Receipt,
+            title: 'Pending QC / Masuk',
+            href: '/inventory?status=QC_PENDING',
+            icon: Clock,
           },
         ],
-      },
-      {
-        type: 'group',
-        title: 'KEUANGAN & AKUNTANSI',
-        icon: Wallet,
-        items: [
-          {
-            title: 'Jurnal Umum',
-            href: '/finance?tab=jurnal',
-            icon: FileText,
-            badge: 'AUDIT',
-            badgeColor: 'bg-yellow-950 text-yellow-300 border-yellow-800',
-          },
-          {
-            title: 'Buku Besar (Ledger)',
-            href: '/finance?tab=buku-besar',
-            icon: BookOpen,
-          },
-          {
-            title: 'Neraca & Laporan',
-            href: '/finance?tab=neraca',
-            icon: Scale,
-            badge: 'LAPORAN',
-            badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800',
-          },
-          {
-            title: 'Arus Kas (Cashflow)',
-            href: '/finance?tab=cashflow',
-            icon: ArrowLeftRight,
-          },
-        ],
-      },
-      {
+      });
+    }
+
+    // 5. Modul Keuangan & Akuntansi
+    const canJournal = hasPermission(user, 'FINANCE_JOURNAL');
+    const canLedger = hasPermission(user, 'FINANCE_LEDGER');
+    const canReport = hasPermission(user, 'FINANCE_REPORT');
+    const canCashflow = hasPermission(user, 'FINANCE_CASHFLOW');
+
+    if (canJournal || canLedger || canReport || canCashflow) {
+      const finItems: SubNavItem[] = [];
+      if (canJournal) {
+        finItems.push({
+          title: 'Jurnal Umum',
+          href: '/finance?tab=jurnal',
+          icon: FileText,
+          badge: 'AUDIT',
+          badgeColor: 'bg-yellow-950 text-yellow-300 border-yellow-800',
+        });
+      }
+      if (canLedger) {
+        finItems.push({
+          title: 'Buku Besar (Ledger)',
+          href: '/finance?tab=buku-besar',
+          icon: BookOpen,
+        });
+      }
+      if (canReport) {
+        finItems.push({
+          title: 'Neraca & Laporan',
+          href: '/finance?tab=neraca',
+          icon: Scale,
+          badge: 'LAPORAN',
+          badgeColor: 'bg-blue-950 text-blue-300 border-blue-800',
+        });
+      }
+      if (canCashflow) {
+        finItems.push({
+          title: 'Arus Kas (Cashflow)',
+          href: '/finance?tab=cashflow',
+          icon: ArrowLeftRight,
+        });
+      }
+
+      if (finItems.length > 0) {
+        entries.push({
+          type: 'group',
+          title: 'KEUANGAN & AKUNTANSI',
+          icon: Wallet,
+          items: finItems,
+        });
+      }
+    }
+
+    // 6. Modul Manajemen SDM
+    if (hasPermission(user, 'ACCOUNT_MANAGE')) {
+      entries.push({
         type: 'link',
         title: 'Manajemen Akun & SDM',
         href: '/accounts',
         icon: Users,
         badge: 'SECURITY',
         badgeColor: 'bg-amber-950 text-amber-300 border-amber-800',
-      },
-      {
-        type: 'link',
-        title: 'Keamanan Akun (2FA)',
-        href: '/2fa-setup',
-        icon: ShieldCheck,
-      },
-      {
-        type: 'link',
-        title: 'Profil & Kredensial',
-        href: '/profile',
-        icon: UserIcon,
-      },
-    ];
+      });
+    }
+
+    // 7. Keamanan & Profil (Selalu ada)
+    entries.push({
+      type: 'link',
+      title: 'Keamanan Akun (2FA)',
+      href: '/2fa-setup',
+      icon: ShieldCheck,
+    });
+    entries.push({
+      type: 'link',
+      title: 'Profil & Kredensial',
+      href: '/profile',
+      icon: UserIcon,
+    });
+
+    return entries;
   };
 
   const navEntries = getNavEntries();
