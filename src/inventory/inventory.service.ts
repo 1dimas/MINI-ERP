@@ -210,7 +210,7 @@ export class InventoryService {
         },
       });
 
-      // Insert ProductUnit with status 'QC_PENDING'
+      // Insert ProductUnit: jika kondisi NEW (Laptop Baru) langsung AVAILABLE (tanpa QC), jika SECOND masuk antrean QC_PENDING
       const unit = await tx.productUnit.create({
         data: {
           serialNumber: normalizedSn,
@@ -219,8 +219,10 @@ export class InventoryService {
           grade: finalGrade,
           hpp,
           price,
-          status: 'QC_PENDING',
+          status: isNew ? 'AVAILABLE' : 'QC_PENDING',
           createdBy: userContext?.id || null,
+          approvedBy: isNew ? (userContext?.id || 'SYSTEM_AUTO_NEW') : null,
+          approvedAt: isNew ? new Date() : null,
           isFisikNormal: isNew ? true : isFisikNormal,
           isMesinNormal: isNew ? true : isMesinNormal,
           isStorageNormal: isNew ? true : isStorageNormal,
@@ -229,7 +231,7 @@ export class InventoryService {
           isTouchpadNormal: isNew ? true : isTouchpadNormal,
           isPortNormal: isNew ? true : isPortNormal,
           isWebcamNormal: isNew ? true : isWebcamNormal,
-          catatanFisik: isNew ? null : catatanFisik,
+          catatanFisik: isNew ? 'Unit Baru (BNIB - Bypass QC)' : catatanFisik,
           purchaseJournalId: purchaseJournal.id,
         },
         include: {

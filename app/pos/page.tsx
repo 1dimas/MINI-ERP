@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { usePosStore, CartItem } from '@/store/usePosStore';
 import {
   Card,
@@ -46,11 +46,13 @@ import {
   TrendingUp,
   X,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 import Cookies from 'js-cookie';
 
-export default function PosPage() {
+function PosContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { cart, totalAmount, addToCart, removeFromCart, clearCart } =
     usePosStore();
 
@@ -69,6 +71,12 @@ export default function PosPage() {
 
   // Struk / Receipt Modal State
   const [completedInvoice, setCompletedInvoice] = useState<any>(null);
+
+  // Riwayat Transaksi Modal State (READ-ONLY UNTUK KASIR)
+  const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
+  const [historyTransactions, setHistoryTransactions] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
+  const [historySearch, setHistorySearch] = useState<string>('');
 
   // Zustand Global POS & Shift Store
   const {
@@ -106,6 +114,70 @@ export default function PosPage() {
   const numericPaid = typeof amountPaid === 'number' ? amountPaid : 0;
   const change = numericPaid - totalAmount;
   const isPayable = cart.length > 0 && numericPaid >= totalAmount;
+
+  // Ambil Data Riwayat Transaksi (GET /api/pos/transactions - Read-Only untuk Kasir)
+  const fetchHistoryTransactions = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const res = await fetch('/api/pos/transactions', {
+        headers: {
+          'x-user-role': user?.role || 'KASIR',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryTransactions(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error('Gagal mengambil riwayat transaksi kasir:', e);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Dengarkan query tab=history (jika kasir membuka via menu sidebar atau link navbar)
+  useEffect(() => {
+    if (searchParams.get('tab') === 'history') {
+      setShowHistoryModal(true);
+      fetchHistoryTransactions();
+    }
+  }, [searchParams]);
+
+  // Filter riwayat berdasarkan pencarian invoice, kasir, atau serial number
+  const filteredHistory = useMemo(() => {
+    if (!historySearch.trim()) return historyTransactions;
+    const q = historySearch.toLowerCase();
+    return historyTransactions.filter((tx: any) => {
+      const inv = (tx.invoiceNumber || '').toLowerCase();
+      const sn = (tx.serialNumber || '').toLowerCase();
+      const cashier = (tx.cashierName || '').toLowerCase();
+      const model = (tx.productUnit?.productModel?.name || '').toLowerCase();
+      return inv.includes(q) || sn.includes(q) || cashier.includes(q) || model.includes(q);
+    });
+  }, [historyTransactions, historySearch]);
+
+  // Buka struk transaksi dari riwayat untuk dilihat & dicetak ulang
+  const handleViewReceiptFromHistory = (tx: any) => {
+    setCompletedInvoice({
+      invoiceNumber: tx.invoiceNumber || tx.id,
+      items: [
+        {
+          modelName: tx.productUnit?.productModel?.name || 'Unit Laptop',
+          serialNumber: tx.serialNumber,
+          price: Number(tx.totalPrice),
+          condition: tx.productUnit?.condition || 'READY',
+          grade: tx.productUnit?.grade || null,
+        },
+      ],
+      totalPenjualan: Number(tx.totalPrice),
+      amountPaid: Number(tx.totalPrice),
+      kembalian: 0,
+      paymentMethod: tx.paymentMethod || 'CASH',
+      cashierName: tx.cashierName || 'Kasir Toko',
+      tanggal: tx.tanggal,
+      status: tx.status,
+    });
+  };
 
   // Initial Load: Ambil identitas user & pasang autoFocus
   useEffect(() => {
@@ -367,14 +439,32 @@ export default function PosPage() {
           {/* Card Scanner Form */}
           <Card className="border-neutral-800 bg-neutral-900/60 shadow-lg">
             <CardHeader className="pb-3 pt-4 px-5">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Barcode className="w-5 h-5 text-emerald-400" />
                   <CardTitle className="text-base font-semibold text-white">
                     Scan Barcode / Serial Number
                   </CardTitle>
                 </div>
-                <span className="text-[11px] text-neutral-400">Tekan Enter untuk input instan</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowHistoryModal(true);
+                      fetchHistoryTransactions();
+                    }}
+                    className="h-7 text-xs border-neutral-700 bg-neutral-800/80 text-neutral-200 hover:text-white cursor-pointer gap-1.5 shadow-sm"
+                  >
+                    <Receipt className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Riwayat Transaksi</span>
+                    <Badge variant="outline" className="text-[9px] border-neutral-600 text-neutral-400 px-1 py-0 hidden sm:inline">
+                      Read Only
+                    </Badge>
+                  </Button>
+                  <span className="text-[11px] text-neutral-400 hidden md:inline">• Enter untuk input</span>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="px-5 pb-5">
@@ -1133,6 +1223,192 @@ export default function PosPage() {
           </div>
         </div>
       )}
+
+      {/* ============================================================ */}
+      {/* MODAL RIWAYAT TRANSAKSI PENJUALAN (READ-ONLY UNTUK KASIR)   */}
+      {/* ============================================================ */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className="w-full max-w-4xl bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 sm:p-5 border-b border-neutral-800 flex items-center justify-between bg-neutral-900/60">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">Riwayat Transaksi Penjualan</h3>
+                    <Badge variant="outline" className="text-[10px] bg-neutral-900 border-neutral-700 text-neutral-300 font-mono">
+                      READ ONLY
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-neutral-400">
+                    Akses kasir: Meninjau nota transaksi & cetak ulang struk pelanggan.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchHistoryTransactions}
+                  disabled={isLoadingHistory}
+                  className="h-8 text-xs border-neutral-800 bg-neutral-900 text-neutral-300 hover:text-white cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+                  Segarkan
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryModal(false)}
+                  className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Toolbar Pencarian */}
+            <div className="p-3 sm:p-4 border-b border-neutral-800/80 bg-neutral-900/30 flex items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Input
+                  placeholder="Cari nomor invoice, kasir, atau serial number..."
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className="bg-black border-neutral-800 text-xs h-9 pl-3 text-white font-mono"
+                />
+              </div>
+              <div className="text-[11px] text-neutral-400 hidden sm:block">
+                Menampilkan <strong>{filteredHistory.length}</strong> nota transaksi
+              </div>
+            </div>
+
+            {/* Tabel Riwayat */}
+            <div className="flex-1 overflow-auto p-0">
+              {isLoadingHistory ? (
+                <div className="py-16 text-center text-neutral-500 text-xs flex flex-col items-center justify-center gap-2 font-mono">
+                  <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+                  <span>Memuat riwayat transaksi kasir...</span>
+                </div>
+              ) : filteredHistory.length === 0 ? (
+                <div className="py-16 text-center text-neutral-500 text-xs font-mono">
+                  Tidak ada riwayat transaksi yang cocok dengan pencarian.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-neutral-900/80 sticky top-0 z-10">
+                    <TableRow className="border-neutral-800">
+                      <TableHead className="text-xs font-semibold text-neutral-400">No. Invoice</TableHead>
+                      <TableHead className="text-xs font-semibold text-neutral-400">Waktu</TableHead>
+                      <TableHead className="text-xs font-semibold text-neutral-400">Kasir</TableHead>
+                      <TableHead className="text-xs font-semibold text-neutral-400">Item & Serial Number</TableHead>
+                      <TableHead className="text-xs font-semibold text-neutral-400">Metode</TableHead>
+                      <TableHead className="text-right text-xs font-semibold text-neutral-400">Total Belanja</TableHead>
+                      <TableHead className="text-center text-xs font-semibold text-neutral-400">Status</TableHead>
+                      <TableHead className="text-center text-xs font-semibold text-neutral-400">Struk</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-neutral-800/60 font-mono text-xs">
+                    {filteredHistory.map((tx: any) => {
+                      const isVoid = tx.status === 'VOID';
+                      return (
+                        <TableRow key={tx.id} className="hover:bg-neutral-900/40 border-neutral-800/80">
+                          <TableCell className="font-bold text-white whitespace-nowrap">
+                            {tx.invoiceNumber || tx.id.slice(0, 13)}
+                          </TableCell>
+                          <TableCell className="text-neutral-400 whitespace-nowrap text-[11px]">
+                            {tx.tanggal ? new Date(tx.tanggal).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
+                          </TableCell>
+                          <TableCell className="text-neutral-300 font-sans text-xs">
+                            {tx.cashierName || 'Kasir'}
+                          </TableCell>
+                          <TableCell className="text-neutral-200 max-w-[200px] truncate font-sans">
+                            <div className="font-medium text-white truncate">
+                              {tx.productUnit?.productModel?.name || 'Unit Laptop'}
+                            </div>
+                            <div className="text-[10px] font-mono text-emerald-400">
+                              SN: {tx.serialNumber}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-neutral-300 text-[11px]">
+                            <Badge variant="outline" className="border-neutral-700 bg-neutral-900 text-neutral-300 text-[10px]">
+                              {tx.paymentMethod || 'CASH'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-white whitespace-nowrap">
+                            {formatRupiah(Number(tx.totalPrice))}
+                          </TableCell>
+                          <TableCell className="text-center whitespace-nowrap">
+                            {isVoid ? (
+                              <Badge variant="outline" className="border-red-800 bg-red-950/60 text-red-300 text-[10px]">
+                                VOID
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-emerald-800 bg-emerald-950/60 text-emerald-300 text-[10px]">
+                                SUCCESS
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center whitespace-nowrap">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                handleViewReceiptFromHistory(tx);
+                              }}
+                              className="h-7 px-2.5 text-[11px] border-neutral-700 bg-neutral-900 text-neutral-200 hover:text-white cursor-pointer gap-1"
+                            >
+                              <Printer className="w-3 h-3 text-emerald-400" />
+                              <span>Struk</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+
+            {/* Footer Notice */}
+            <div className="p-3.5 bg-neutral-900/70 border-t border-neutral-800 text-[11px] text-neutral-400 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-center sm:text-left">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>
+                  Catatan Keamanan: Pembatalan transaksi (VOID) adalah wewenang Owner dan tidak dapat dilakukan oleh akun Kasir.
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistoryModal(false)}
+                className="h-7 text-xs border-neutral-700 text-neutral-300 cursor-pointer"
+              >
+                Tutup
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function PosPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center bg-neutral-950 text-neutral-400 text-xs font-mono">
+          <Loader2 className="w-5 h-5 animate-spin mr-2 text-emerald-400" />
+          Memuat Terminal Kasir SOLIT POS...
+        </div>
+      }
+    >
+      <PosContent />
+    </Suspense>
   );
 }

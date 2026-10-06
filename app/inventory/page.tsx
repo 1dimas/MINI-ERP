@@ -251,7 +251,12 @@ function InventoryContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Gagal menyimpan unit');
 
-      showFeedback('success', `Unit ${data.serialNumber} berhasil disimpan!`);
+      showFeedback(
+        'success',
+        data.condition === 'NEW'
+          ? `Unit ${data.serialNumber} (Laptop Baru) berhasil disimpan dengan status AVAILABLE (Siap Jual) tanpa QC!`
+          : `Unit ${data.serialNumber} berhasil disimpan dengan status QC_PENDING.`
+      );
       setShowAddUnitModal(false);
       fetchData();
     } catch (err: any) {
@@ -1467,15 +1472,24 @@ function InventoryContent() {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Catatan Pemeriksaan Fisik</Label>
-                  <Input
-                    placeholder="Mulus 98%, keyboard backlit nyala, baterai health 85%"
-                    value={unitFormData.catatanFisik}
-                    onChange={(e) => setUnitFormData({ ...unitFormData, catatanFisik: e.target.value })}
-                    className="bg-black border-neutral-700 text-xs"
-                  />
-                </div>
+                {unitFormData.condition === 'NEW' ? (
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-800/80 rounded-lg text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      <strong>Laptop Baru (BNIB):</strong> Tanpa perlu antrean QC teknisi. Unit akan otomatis berstatus <strong>AVAILABLE</strong> dan langsung siap dijual di kasir POS.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Catatan Pemeriksaan Fisik</Label>
+                    <Input
+                      placeholder="Mulus 98%, keyboard backlit nyala, baterai health 85%"
+                      value={unitFormData.catatanFisik}
+                      onChange={(e) => setUnitFormData({ ...unitFormData, catatanFisik: e.target.value })}
+                      className="bg-black border-neutral-700 text-xs"
+                    />
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-neutral-800">
                   <Button

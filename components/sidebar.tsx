@@ -100,6 +100,14 @@ export default function Sidebar() {
         },
         {
           type: 'link',
+          title: 'Riwayat Transaksi',
+          href: '/pos?tab=history',
+          icon: Receipt,
+          badge: 'READ ONLY',
+          badgeColor: 'bg-neutral-800 text-neutral-300 border-neutral-700',
+        },
+        {
+          type: 'link',
           title: 'Cek Ketersediaan Stok',
           href: '/inventory',
           icon: Laptop,
@@ -168,16 +176,28 @@ export default function Sidebar() {
           icon: Wallet,
           items: [
             {
+              title: 'Jurnal Umum',
+              href: '/finance?tab=jurnal',
+              icon: FileText,
+              badge: 'AUDIT',
+              badgeColor: 'bg-yellow-950 text-yellow-300 border-yellow-800',
+            },
+            {
+              title: 'Buku Besar (Ledger)',
+              href: '/finance?tab=buku-besar',
+              icon: BookOpen,
+            },
+            {
+              title: 'Neraca & Laporan',
+              href: '/finance?tab=neraca',
+              icon: Scale,
+              badge: 'LAPORAN',
+              badgeColor: 'bg-blue-950 text-blue-300 border-blue-800',
+            },
+            {
               title: 'Arus Kas (Cashflow)',
               href: '/finance?tab=cashflow',
               icon: ArrowLeftRight,
-            },
-            {
-              title: 'Akuntansi & Pembukuan',
-              href: '/finance?tab=accounting',
-              icon: BookOpen,
-              badge: 'LAPORAN',
-              badgeColor: 'bg-blue-950 text-blue-300 border-blue-800',
             },
           ],
         },
@@ -243,16 +263,28 @@ export default function Sidebar() {
         icon: Wallet,
         items: [
           {
+            title: 'Jurnal Umum',
+            href: '/finance?tab=jurnal',
+            icon: FileText,
+            badge: 'AUDIT',
+            badgeColor: 'bg-yellow-950 text-yellow-300 border-yellow-800',
+          },
+          {
+            title: 'Buku Besar (Ledger)',
+            href: '/finance?tab=buku-besar',
+            icon: BookOpen,
+          },
+          {
+            title: 'Neraca & Laporan',
+            href: '/finance?tab=neraca',
+            icon: Scale,
+            badge: 'LAPORAN',
+            badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800',
+          },
+          {
             title: 'Arus Kas (Cashflow)',
             href: '/finance?tab=cashflow',
             icon: ArrowLeftRight,
-          },
-          {
-            title: 'Akuntansi & Pembukuan',
-            href: '/finance?tab=accounting',
-            icon: BookOpen,
-            badge: 'AUDIT',
-            badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800',
           },
         ],
       },
@@ -275,7 +307,13 @@ export default function Sidebar() {
     if (queryPart) {
       const urlParams = new URLSearchParams(queryPart);
       for (const [key, val] of urlParams.entries()) {
-        if (searchParams.get(key) !== val) return false;
+        const currentVal = searchParams.get(key);
+        if (key === 'tab') {
+          if (val === 'jurnal' && (!currentVal || currentVal === 'jurnal' || currentVal === 'accounting')) {
+            continue;
+          }
+        }
+        if (currentVal !== val) return false;
       }
       return true;
     }

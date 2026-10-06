@@ -170,12 +170,6 @@ export class JournalService {
       throw new NotFoundException(`Jurnal dengan ID '${id}' tidak ditemukan.`);
     }
 
-    if (existingEntry.sourceType !== 'MANUAL') {
-      throw new ForbiddenException(
-        'Jurnal sistem tidak boleh diedit secara manual. Gunakan fitur Void/Retur.',
-      );
-    }
-
     let newTotal = Number(existingEntry.total);
     let newLinesData = undefined;
 
@@ -204,7 +198,8 @@ export class JournalService {
     }
 
     const transDate = dto.tanggal ? new Date(dto.tanggal) : existingEntry.tanggal;
-    const keterangan = dto.keterangan || existingEntry.keterangan;
+    const keterangan = dto.keterangan !== undefined ? dto.keterangan : existingEntry.keterangan;
+    const isEditedVal = dto.isEdited !== undefined ? dto.isEdited : true;
 
     // Execute atomic transaction
     return this.prisma.$transaction(async (tx) => {
@@ -220,7 +215,9 @@ export class JournalService {
           tanggal: transDate,
           keterangan,
           total: newTotal,
-          isEdited: true, // Flag jurnal pernah diedit
+          isEdited: isEditedVal, // Flag menandai jurnal sudah dikoreksi / diaudit
+          approvedBy: user.id,
+          approvedAt: new Date(),
           ...(newLinesData
             ? {
                 lines: {

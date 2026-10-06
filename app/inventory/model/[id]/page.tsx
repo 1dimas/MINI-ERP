@@ -161,7 +161,12 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Gagal menambah unit fisik');
 
-      showFeedback('success', `Unit ${data.serialNumber} berhasil diinput dengan status QC_PENDING.`);
+      showFeedback(
+        'success',
+        data.condition === 'NEW'
+          ? `Unit ${data.serialNumber} (Laptop Baru) berhasil ditambahkan langsung dengan status AVAILABLE (Siap Jual) tanpa QC!`
+          : `Unit ${data.serialNumber} berhasil diinput dengan status QC_PENDING.`
+      );
       setShowAddUnitModal(false);
       resetForm();
       fetchModel();
@@ -967,99 +972,111 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
 
-              {formData.condition === 'SECOND' && (
-                <div className="p-4 bg-neutral-900/60 border border-neutral-800 rounded-lg space-y-3">
-                  <div className="text-xs font-bold text-white flex items-center justify-between border-b border-neutral-800 pb-2">
-                    <span>Checklist QC Fisik & Fungsionalitas:</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isFisikNormal}
-                        onChange={(e) => setFormData({ ...formData, isFisikNormal: e.target.checked })}
-                        className="accent-emerald-500 rounded w-4 h-4"
-                      />
-                      <span>Fisik Mulus</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isMesinNormal}
-                        onChange={(e) => setFormData({ ...formData, isMesinNormal: e.target.checked })}
-                        className="accent-emerald-500 rounded w-4 h-4"
-                      />
-                      <span>Mesin Normal</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isStorageNormal}
-                        onChange={(e) => setFormData({ ...formData, isStorageNormal: e.target.checked })}
-                        className="accent-emerald-500 rounded w-4 h-4"
-                      />
-                      <span>Storage SSD</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isSuhuNormal}
-                        onChange={(e) => setFormData({ ...formData, isSuhuNormal: e.target.checked })}
-                        className="accent-emerald-500 rounded w-4 h-4"
-                      />
-                      <span>Suhu Normal</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isKeyboardNormal}
-                        onChange={(e) => setFormData({ ...formData, isKeyboardNormal: e.target.checked })}
-                        className="accent-emerald-500 rounded w-4 h-4"
-                      />
-                      <span>Keyboard</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isTouchpadNormal}
-                        onChange={(e) => setFormData({ ...formData, isTouchpadNormal: e.target.checked })}
-                        className="accent-emerald-500 rounded w-4 h-4"
-                      />
-                      <span>Touchpad</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isPortNormal}
-                        onChange={(e) => setFormData({ ...formData, isPortNormal: e.target.checked })}
-                        className="accent-emerald-500 rounded w-4 h-4"
-                      />
-                      <span>Port I/O</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isWebcamNormal}
-                        onChange={(e) => setFormData({ ...formData, isWebcamNormal: e.target.checked })}
-                        className="accent-emerald-500 rounded w-4 h-4"
-                      />
-                      <span>Webcam & Mic</span>
-                    </label>
+              {formData.condition === 'NEW' ? (
+                <div className="p-3.5 bg-emerald-950/40 border border-emerald-800/80 rounded-lg text-emerald-300 text-xs flex items-center gap-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <div>
+                    <strong className="text-white block font-sans">Unit Baru (BNIB - Bypass QC)</strong>
+                    <span className="text-[11px] text-emerald-300/90 leading-relaxed">
+                      Laptop baru tidak memerlukan checklist inspeksi fisik atau antrean QC. Unit akan otomatis berstatus <strong>AVAILABLE</strong> dan langsung siap dijual di kasir POS.
+                    </span>
                   </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  <div className="p-4 bg-neutral-900/60 border border-neutral-800 rounded-lg space-y-3">
+                    <div className="text-xs font-bold text-white flex items-center justify-between border-b border-neutral-800 pb-2">
+                      <span>Checklist QC Fisik & Fungsionalitas:</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.isFisikNormal}
+                          onChange={(e) => setFormData({ ...formData, isFisikNormal: e.target.checked })}
+                          className="accent-emerald-500 rounded w-4 h-4"
+                        />
+                        <span>Fisik Mulus</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.isMesinNormal}
+                          onChange={(e) => setFormData({ ...formData, isMesinNormal: e.target.checked })}
+                          className="accent-emerald-500 rounded w-4 h-4"
+                        />
+                        <span>Mesin Normal</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.isStorageNormal}
+                          onChange={(e) => setFormData({ ...formData, isStorageNormal: e.target.checked })}
+                          className="accent-emerald-500 rounded w-4 h-4"
+                        />
+                        <span>Storage SSD</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.isSuhuNormal}
+                          onChange={(e) => setFormData({ ...formData, isSuhuNormal: e.target.checked })}
+                          className="accent-emerald-500 rounded w-4 h-4"
+                        />
+                        <span>Suhu Normal</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.isKeyboardNormal}
+                          onChange={(e) => setFormData({ ...formData, isKeyboardNormal: e.target.checked })}
+                          className="accent-emerald-500 rounded w-4 h-4"
+                        />
+                        <span>Keyboard</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.isTouchpadNormal}
+                          onChange={(e) => setFormData({ ...formData, isTouchpadNormal: e.target.checked })}
+                          className="accent-emerald-500 rounded w-4 h-4"
+                        />
+                        <span>Touchpad</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.isPortNormal}
+                          onChange={(e) => setFormData({ ...formData, isPortNormal: e.target.checked })}
+                          className="accent-emerald-500 rounded w-4 h-4"
+                        />
+                        <span>Port I/O</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.isWebcamNormal}
+                          onChange={(e) => setFormData({ ...formData, isWebcamNormal: e.target.checked })}
+                          className="accent-emerald-500 rounded w-4 h-4"
+                        />
+                        <span>Webcam & Mic</span>
+                      </label>
+                    </div>
+                  </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="unit-notes" className="text-xs font-semibold text-neutral-300">Catatan Fisik:</Label>
-                <textarea
-                  id="unit-notes"
-                  rows={2}
-                  placeholder="Contoh: Lecet halus di top cover"
-                  value={formData.catatanFisik}
-                  onChange={(e) => setFormData({ ...formData, catatanFisik: e.target.value })}
-                  className="w-full p-2.5 bg-black border border-neutral-800 rounded-md text-xs text-white focus:outline-none focus:border-neutral-600"
-                />
-              </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="unit-notes" className="text-xs font-semibold text-neutral-300">Catatan Fisik:</Label>
+                    <textarea
+                      id="unit-notes"
+                      rows={2}
+                      placeholder="Contoh: Lecet halus di top cover"
+                      value={formData.catatanFisik}
+                      onChange={(e) => setFormData({ ...formData, catatanFisik: e.target.value })}
+                      className="w-full p-2.5 bg-black border border-neutral-800 rounded-md text-xs text-white focus:outline-none focus:border-neutral-600"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="flex justify-end gap-2 pt-2 border-t border-neutral-800">
                 <Button type="button" variant="outline" onClick={() => setShowAddUnitModal(false)}>

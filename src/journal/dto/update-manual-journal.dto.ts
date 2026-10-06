@@ -22,4 +22,7 @@ export class UpdateManualJournalDto {
   @ValidateNested({ each: true })
   @Type(() => JournalLineItemDto)
   lines?: JournalLineItemDto[];
+
+  @IsOptional()
+  isEdited?: boolean;
 }

@@ -832,7 +832,7 @@ export default function DashboardPage() {
                                   <span className="text-[11px] text-neutral-500 font-mono italic">
                                     Dibatalkan
                                   </span>
-                                ) : (
+                                ) : user?.role === 'OWNER' ? (
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -852,6 +852,10 @@ export default function DashboardPage() {
                                       </>
                                     )}
                                   </Button>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-500 font-mono bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                                    Read Only
+                                  </span>
                                 )}
                               </TableCell>
                             </TableRow>

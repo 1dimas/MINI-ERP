@@ -12,6 +12,7 @@ import {
   LogOut,
   LayoutDashboard,
   Laptop,
+  Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -179,7 +180,19 @@ export default function PosLayout({
             </Badge>
           </div>
 
-          {/* 4. Tombol Cek Stok Barang (Read-Only untuk Kasir & Owner) */}
+          {/* 4. Tombol Riwayat Transaksi (Read-Only untuk Kasir & Owner) */}
+          <Link href="/pos?tab=history">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs text-neutral-300 hover:text-white border-neutral-800 bg-neutral-900 cursor-pointer"
+            >
+              <Receipt className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Riwayat Nota</span>
+            </Button>
+          </Link>
+
+          {/* 5. Tombol Cek Stok Barang (Read-Only untuk Kasir & Owner) */}
           <Link href="/inventory">
             <Button
               variant="outline"
