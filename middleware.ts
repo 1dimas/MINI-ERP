@@ -11,6 +11,7 @@ import { AUTH_HEADERS } from '@/lib/api-auth';
  */
 const PUBLIC_API_ROUTES = [
   '/api/auth/login',
+  '/api/auth/logout',
   '/api/auth/register',
   '/api/auth/2fa/verify',
   '/api/auth/status',

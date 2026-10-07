@@ -78,12 +78,21 @@ export class PosService {
         throw new BadRequestException('Uang bayar kurang');
       }
 
-      // 4. Update Stok Unit -> 'SOLD'
+      // 4. Update Stok Unit -> 'SOLD' (Atomik dengan optimistik lock: hanya yang AVAILABLE)
       const unitIds = units.map((u) => u.id);
-      await tx.productUnit.updateMany({
-        where: { id: { in: unitIds } },
+      const updateResult = await tx.productUnit.updateMany({
+        where: {
+          id: { in: unitIds },
+          status: 'AVAILABLE',
+        },
         data: { status: 'SOLD' },
       });
+
+      if (updateResult.count !== unitIds.length) {
+        throw new BadRequestException(
+          'Gagal memproses transaksi: satu atau lebih unit barang baru saja terjual dalam transaksi lain.',
+        );
+      }
 
       // Generate nomor invoice berurutan (INV-YYYYMMDD-XXXX)
       const now = new Date();
@@ -285,6 +294,7 @@ export class PosService {
         await tx.productUnit.updateMany({
           where: {
             id: { in: units.map((u) => u.id) },
+            status: 'SOLD',
           },
           data: {
             status: 'AVAILABLE',

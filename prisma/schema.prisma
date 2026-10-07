@@ -65,6 +65,10 @@ model JournalEntry {
   
   lines       JournalLine[]
   productUnit ProductUnit?
+
+  @@index([tanggal])
+  @@index([status])
+  @@index([sourceType])
 }
 
 model JournalLine {
@@ -76,6 +80,9 @@ model JournalLine {
   
   entry        JournalEntry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
   account      ChartOfAccount @relation(fields: [accountCode], references: [code])
+
+  @@index([accountCode])
+  @@index([entryId])
 }
 
 // --- MODUL KATALOG INDUK & ITEM FISIK (PRODUCT MODEL + UNIT & QC) ---
@@ -127,6 +134,9 @@ model ProductUnit {
 
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+
+  @@index([status])
+  @@index([productModelId])
 }
 
 model CashierShift {
@@ -140,6 +150,8 @@ model CashierShift {
   status              String    @default("OPEN")  // OPEN, CLOSED
 
   transactions        PosTransaction[]
+
+  @@index([userId, status])
 }
 
 model PosTransaction {
@@ -162,4 +174,8 @@ model PosTransaction {
   createdBy      String?
   approvedBy     String?
   approvedAt     DateTime?
+
+  @@index([tanggal])
+  @@index([status])
+  @@index([shiftId])
 }

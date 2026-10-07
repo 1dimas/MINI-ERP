@@ -77,12 +77,6 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
     catatanFisik: '',
   });
 
-  // POS Checkout Simulation State
-  const [posSn, setPosSn] = useState<string>('');
-  const [posAccountCode, setPosAccountCode] = useState<string>('110');
-  const [posFeedback, setPosFeedback] = useState<{ type: 'success' | 'error'; message: string; details?: any } | null>(null);
-  const [isSubmittingPos, setIsSubmittingPos] = useState<boolean>(false);
-
   // Global Notification Feedback
   const [apiFeedback, setApiFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -262,34 +256,6 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  const handlePosCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!posSn.trim()) {
-      setPosFeedback({ type: 'error', message: 'Ketik atau scan Serial Number (SN) laptop!' });
-      return;
-    }
-    setIsSubmittingPos(true);
-    setPosFeedback(null);
-    try {
-      const res = await fetch('/api/pos/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': role,
-        },
-        body: JSON.stringify({ serialNumber: posSn.trim().toUpperCase(), paymentAccountCode: posAccountCode }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Gagal memproses POS');
-      setPosFeedback({ type: 'success', message: data.message, details: data });
-      fetchModel();
-    } catch (err: any) {
-      setPosFeedback({ type: 'error', message: err.message });
-    } finally {
-      setIsSubmittingPos(false);
-    }
-  };
-
   const resetForm = () => {
     setFormData({
       serialNumber: '',
@@ -440,7 +406,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
             <CardTitle className="text-2xl font-mono text-emerald-400">{countAvailable} Unit</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <p className="text-[11px] text-neutral-500">Bisa di-scan di Kasir POS</p>
+            <p className="text-[11px] text-neutral-500">Unit siap dijual di kasir</p>
           </CardContent>
         </Card>
 
@@ -487,121 +453,6 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
           </CardContent>
         </Card>
       </section>
-
-      {/* POS TERMINAL CHECKOUT SECTION (RBAC ADAPTIVE) */}
-      {role === 'FINANCE' ? (
-        <section className="p-4 border border-neutral-800 bg-neutral-950 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <ShoppingCart className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                Akses Kasir POS Ditiadakan untuk Role Finance
-              </h2>
-              <p className="text-xs text-neutral-400">
-                Finance memantau & mengelola data barang. Transaksi penjualan kasir otomatis tercatat ke Arus Kas (Cashflow) & Jurnal Umum.
-              </p>
-            </div>
-          </div>
-          <Link href="/finance">
-            <Button variant="outline" className="border-neutral-700 hover:bg-neutral-900 text-white text-xs font-semibold">
-              Buka Laporan Keuangan &rarr;
-            </Button>
-          </Link>
-        </section>
-      ) : role === 'KASIR' ? (
-        <section className="p-4 border border-emerald-900/40 bg-emerald-950/20 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
-              <ShoppingCart className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                Mode Stok Kasir: Read-Only
-              </h2>
-              <p className="text-xs text-neutral-400">
-                Gunakan Terminal Kasir POS untuk scan barcode SN dan mencetak nota pembayaran pelanggan.
-              </p>
-            </div>
-          </div>
-          <Link href="/pos">
-            <Button className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold shadow-lg">
-              <ShoppingCart className="w-4 h-4 mr-1.5" /> Buka Terminal Kasir (POS)
-            </Button>
-          </Link>
-        </section>
-      ) : (
-        <section className="p-5 border border-neutral-800 bg-neutral-950 rounded-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-emerald-400" />
-              Scan & Jual Unit Model Ini di POS
-            </h2>
-            <Badge variant="outline" className="border-emerald-500 text-emerald-400 font-mono text-xs">
-              STRICT SN VALIDATION
-            </Badge>
-          </div>
-
-          <form onSubmit={handlePosCheckout} className="flex flex-col md:flex-row gap-3 items-end">
-            <div className="flex-1 space-y-1.5 w-full">
-              <Label htmlFor="pos-sn-input" className="text-xs font-semibold text-neutral-300">
-                Scan / Input Serial Number (SN) Unit:
-              </Label>
-              <div className="relative">
-                <Input
-                  id="pos-sn-input"
-                  placeholder="Contoh: SN-THINKPAD-T14-001"
-                  value={posSn}
-                  onChange={(e) => setPosSn(e.target.value)}
-                  className="bg-black border-neutral-700 text-white font-mono text-sm uppercase pl-9"
-                />
-                <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-3" />
-              </div>
-            </div>
-
-            <div className="w-full md:w-48 space-y-1.5">
-              <Label htmlFor="pos-account" className="text-xs font-semibold text-neutral-300">Metode Pembayaran:</Label>
-              <select
-                id="pos-account"
-                value={posAccountCode}
-                onChange={(e) => setPosAccountCode(e.target.value)}
-                className="w-full h-10 px-3 bg-black border border-neutral-700 rounded-md text-xs text-white"
-              >
-                <option value="110">110 - Kas Toko (Tunai)</option>
-                <option value="120">120 - Bank BCA (Transfer)</option>
-              </select>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={isSubmittingPos}
-              className="w-full md:w-auto h-10 bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-6"
-            >
-              {isSubmittingPos ? 'Memproses...' : 'Proses Jual (POS Checkout)'}
-            </Button>
-          </form>
-
-          {posFeedback && (
-            <div
-              className={`p-4 rounded-lg border text-xs space-y-2 ${
-                posFeedback.type === 'success'
-                  ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200'
-                  : 'bg-red-950/80 border-red-500 text-red-200'
-              }`}
-            >
-              <div className="flex items-center gap-2 font-bold text-sm">
-                {posFeedback.type === 'success' ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                ) : (
-                  <XCircle className="w-5 h-5 text-red-400" />
-                )}
-                {posFeedback.message}
-              </div>
-            </div>
-          )}
-        </section>
-      )}
 
       {/* UNITS TABLE TOOLBAR & LIST */}
       <main className="space-y-4">
@@ -827,17 +678,6 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
                                 className="h-7 border-blue-700 text-blue-300 hover:bg-blue-950 text-[10px] font-bold"
                               >
                                 <Wrench className="w-3 h-3 mr-1" /> Upgrade
-                              </Button>
-                            )}
-
-                            {unit.status === 'AVAILABLE' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setPosSn(unit.serialNumber)}
-                                className="h-7 border-emerald-700 text-emerald-300 hover:bg-emerald-950 text-[10px]"
-                              >
-                                Scan di POS
                               </Button>
                             )}
 

@@ -34,6 +34,8 @@ import {
   Square,
   Sparkles,
   Layers,
+  UserCog,
+  ArrowRightLeft,
 } from 'lucide-react';
 import {
   APP_PERMISSIONS,
@@ -121,6 +123,12 @@ function AccountsContent() {
   const [permTargetAccount, setPermTargetAccount] = useState<AccountItem | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [submittingPerms, setSubmittingPerms] = useState(false);
+
+  // Modal Ubah Role Akun (misal KASIR -> FINANCE)
+  const [roleTargetAccount, setRoleTargetAccount] = useState<AccountItem | null>(null);
+  const [newSelectedRole, setNewSelectedRole] = useState<'KASIR' | 'FINANCE' | 'OWNER'>('KASIR');
+  const [syncPermissionsWithRole, setSyncPermissionsWithRole] = useState(true);
+  const [submittingRole, setSubmittingRole] = useState(false);
 
   // Action Loading tracking
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -406,6 +414,52 @@ function AccountsContent() {
     }
   };
 
+  // Buka Modal Ubah Role
+  const handleOpenRoleModal = (account: AccountItem) => {
+    setRoleTargetAccount(account);
+    setNewSelectedRole(account.role);
+    setSyncPermissionsWithRole(true);
+  };
+
+  // Simpan Perubahan Role
+  const handleSaveRoleChange = async () => {
+    if (!roleTargetAccount) return;
+    if (roleTargetAccount.role === newSelectedRole) {
+      showToast(`Akun ${roleTargetAccount.name} sudah memiliki role ${newSelectedRole}`, 'error');
+      setRoleTargetAccount(null);
+      return;
+    }
+
+    setSubmittingRole(true);
+    try {
+      const res = await fetch(`/api/account/${roleTargetAccount.id}/role`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          role: newSelectedRole,
+          resetPermissions: syncPermissionsWithRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Gagal mengubah role akun');
+      }
+      showToast(
+        data.message || `Role untuk ${roleTargetAccount.name} berhasil diubah menjadi ${newSelectedRole}!`,
+        'success'
+      );
+      setRoleTargetAccount(null);
+      fetchAccounts(true);
+    } catch (err: any) {
+      showToast(err.message || 'Gagal mengubah role akun', 'error');
+    } finally {
+      setSubmittingRole(false);
+    }
+  };
+
   // Grouped Permissions by Category
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, PermissionDefinition[]> = {};
@@ -681,17 +735,29 @@ function AccountsContent() {
 
                           {/* Role */}
                           <td className="p-4">
-                            <Badge
-                              className={`text-[10px] font-mono ${
-                                account.role === 'OWNER'
-                                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
-                                  : account.role === 'FINANCE'
-                                  ? 'bg-blue-500/15 text-blue-300 border-blue-500/40'
-                                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
-                              }`}
-                            >
-                              {account.role}
-                            </Badge>
+                            <div className="flex items-center gap-1.5">
+                              <Badge
+                                className={`text-[10px] font-mono ${
+                                  account.role === 'OWNER'
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                                    : account.role === 'FINANCE'
+                                    ? 'bg-blue-500/15 text-blue-300 border-blue-500/40'
+                                    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                                }`}
+                              >
+                                {account.role}
+                              </Badge>
+                              {!isArchived && !isCurrentOwner && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenRoleModal(account)}
+                                  className="p-1 text-neutral-400 hover:text-purple-300 hover:bg-purple-950/40 rounded transition"
+                                  title="Ganti Role Akun Ini"
+                                >
+                                  <UserCog className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
 
                           {/* Fitur Diizinkan (Management Fitur) */}
@@ -807,6 +873,21 @@ function AccountsContent() {
                               </span>
                             ) : (
                               <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                {/* Tombol Ubah Role */}
+                                {!isArchived && !isCurrentOwner && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleOpenRoleModal(account)}
+                                    className="h-7 text-[11px] bg-neutral-900 border-neutral-700 text-purple-300 hover:bg-purple-950/40 hover:text-purple-200 hover:border-purple-700 gap-1"
+                                    title="Ubah Role Karyawan (misal Kasir ke Akuntansi)"
+                                  >
+                                    <UserCog className="w-3 h-3 text-purple-400" />
+                                    Role
+                                  </Button>
+                                )}
+
                                 {/* Tombol Kelola Fitur */}
                                 {!isArchived && (
                                   <Button
@@ -1368,6 +1449,189 @@ function AccountsContent() {
                 </Button>
               </div>
             </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 4: UBAH ROLE KARYAWAN (MISAL KASIR KE FINANCE)     */}
+      {/* ======================================================== */}
+      {roleTargetAccount && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg bg-neutral-900 border-neutral-800 text-white shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-neutral-800">
+              <div>
+                <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                  <UserCog className="w-5 h-5 text-purple-400" />
+                  Ubah Role Akun
+                </CardTitle>
+                <CardDescription className="text-xs text-neutral-400 font-mono">
+                  {roleTargetAccount.name} ({roleTargetAccount.email})
+                </CardDescription>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoleTargetAccount(null)}
+                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </CardHeader>
+
+            <div className="p-5 space-y-4 text-xs font-sans">
+              <div className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] text-neutral-400 font-mono uppercase">Role Saat Ini</p>
+                  <p className="font-bold text-white text-sm mt-0.5">{roleTargetAccount.role}</p>
+                </div>
+                <ArrowRightLeft className="w-4 h-4 text-neutral-600" />
+                <div className="text-right">
+                  <p className="text-[11px] text-purple-400 font-mono uppercase">Role Baru</p>
+                  <p className="font-bold text-purple-300 text-sm mt-0.5">{newSelectedRole}</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs text-neutral-300 font-bold block mb-2">
+                  Pilih Role Akses Baru
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {/* Pilihan 1: KASIR */}
+                  <div
+                    onClick={() => setNewSelectedRole('KASIR')}
+                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                      newSelectedRole === 'KASIR'
+                        ? 'bg-emerald-950/40 border-emerald-500/80 text-emerald-200'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-xs">KASIR</span>
+                      <div
+                        className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                          newSelectedRole === 'KASIR'
+                            ? 'border-emerald-400 bg-emerald-400'
+                            : 'border-neutral-600'
+                        }`}
+                      >
+                        {newSelectedRole === 'KASIR' && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-black" />
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-neutral-400">
+                      Terminal POS, cetak nota struk, cek stok, dan shift kasir.
+                    </p>
+                  </div>
+
+                  {/* Pilihan 2: FINANCE */}
+                  <div
+                    onClick={() => setNewSelectedRole('FINANCE')}
+                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                      newSelectedRole === 'FINANCE'
+                        ? 'bg-blue-950/40 border-blue-500/80 text-blue-200'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-xs">FINANCE</span>
+                      <div
+                        className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                          newSelectedRole === 'FINANCE'
+                            ? 'border-blue-400 bg-blue-400'
+                            : 'border-neutral-600'
+                        }`}
+                      >
+                        {newSelectedRole === 'FINANCE' && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-black" />
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-neutral-400">
+                      Jurnal umum, buku besar, neraca laba rugi, dan arus kas.
+                    </p>
+                  </div>
+
+                  {/* Pilihan 3: OWNER */}
+                  <div
+                    onClick={() => setNewSelectedRole('OWNER')}
+                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                      newSelectedRole === 'OWNER'
+                        ? 'bg-amber-950/40 border-amber-500/80 text-amber-200'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-xs">OWNER</span>
+                      <div
+                        className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                          newSelectedRole === 'OWNER'
+                            ? 'border-amber-400 bg-amber-400'
+                            : 'border-neutral-600'
+                        }`}
+                      >
+                        {newSelectedRole === 'OWNER' && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-black" />
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-neutral-400">
+                      Super Admin pemilik toko dengan akses ke semua fitur.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Opsi Sinkronisasi Fitur Otomatis */}
+              {newSelectedRole !== 'OWNER' && (
+                <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={syncPermissionsWithRole}
+                      onChange={(e) => setSyncPermissionsWithRole(e.target.checked)}
+                      className="mt-0.5 rounded border-neutral-700 text-purple-600 focus:ring-purple-500 bg-neutral-900"
+                    />
+                    <div>
+                      <span className="font-bold text-neutral-200 block text-xs">
+                        Sinkronisasi Fitur Default Otomatis
+                      </span>
+                      <span className="text-[11px] text-neutral-400 leading-relaxed block mt-0.5">
+                        {syncPermissionsWithRole
+                          ? `Hak akses akun akan otomatis disesuaikan dengan template fitur standar ${newSelectedRole}.`
+                          : `Pertahankan hak akses kustom yang sudah ada sebelumnya.`}
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end gap-2 border-t border-neutral-800/80">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRoleTargetAccount(null)}
+                  className="bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  disabled={submittingRole}
+                  onClick={handleSaveRoleChange}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-bold gap-1.5 shadow-lg shadow-purple-900/30"
+                >
+                  {submittingRole ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <>
+                      <UserCog className="w-4 h-4" />
+                      Simpan Perubahan Role
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </Card>
         </div>
       )}

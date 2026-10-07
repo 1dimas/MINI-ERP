@@ -30,9 +30,17 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!items || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0 || !items.every((it) => typeof it === 'string' && it.trim())) {
       return NextResponse.json(
-        { message: 'Serial Number (SN) item wajib diisi / di-scan!' },
+        { message: 'Serial Number (SN) item wajib diisi / di-scan dengan benar!' },
+        { status: 400 }
+      );
+    }
+
+    const numericAmount = Number(amountPaid);
+    if (isNaN(numericAmount) || numericAmount < 0) {
+      return NextResponse.json(
+        { message: 'Nominal pembayaran tidak valid atau bernilai negatif.' },
         { status: 400 }
       );
     }
@@ -41,7 +49,7 @@ export async function POST(req: Request) {
     const result = await posService.checkout(
       {
         paymentMethod,
-        amountPaid: Number(amountPaid),
+        amountPaid: numericAmount,
         items,
       },
       {

@@ -3,15 +3,33 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcrypt';
 import { signJwt } from '@/lib/auth-token';
 import { getEffectivePermissions } from '@/lib/permissions';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const ipLimit = rateLimit(`login:ip:${ip}`, { max: 10, intervalMs: 60 * 1000 });
+    if (!ipLimit.success) {
+      return NextResponse.json(
+        { message: `Terlalu banyak percobaan login. Silakan coba lagi dalam ${ipLimit.retryAfterSeconds} detik.` },
+        { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfterSeconds) } }
+      );
+    }
+
     const { email, password } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json(
         { message: 'Email dan password wajib diisi' },
         { status: 400 }
+      );
+    }
+
+    const emailLimit = rateLimit(`login:email:${email.toLowerCase().trim()}`, { max: 5, intervalMs: 60 * 1000 });
+    if (!emailLimit.success) {
+      return NextResponse.json(
+        { message: `Akun ini terlalu banyak percobaan gagal. Silakan tunggu ${emailLimit.retryAfterSeconds} detik.` },
+        { status: 429, headers: { 'Retry-After': String(emailLimit.retryAfterSeconds) } }
       );
     }
 
@@ -75,18 +93,22 @@ export async function POST(req: Request) {
       },
     });
 
-    // Simpan ke cookies via Next.js response cookies
-    response.cookies.set('access_token', token, {
-      httpOnly: false, // Memungkinkan js-cookie membaca atau memodifikasi jika diperlukan
+    // Simpan ke cookies via Next.js response cookies (HttpOnly untuk keamanan dari XSS)
+    const isProd = process.env.NODE_ENV === 'production';
+    const cookieBaseOptions = {
+      httpOnly: true,
+      secure: isProd,
       path: '/',
       maxAge: 60 * 60 * 24,
-      sameSite: 'lax',
-    });
-    response.cookies.set('token', token, {
+      sameSite: 'lax' as const,
+    };
+
+    response.cookies.set('access_token', token, cookieBaseOptions);
+    response.cookies.set('token', token, cookieBaseOptions);
+    // Role non-sensitive cookie untuk helper ringan jika diperlukan client
+    response.cookies.set('user_role', user.role || '', {
+      ...cookieBaseOptions,
       httpOnly: false,
-      path: '/',
-      maxAge: 60 * 60 * 24,
-      sameSite: 'lax',
     });
 
     return response;

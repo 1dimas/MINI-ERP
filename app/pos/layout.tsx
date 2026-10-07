@@ -13,6 +13,8 @@ import {
   LayoutDashboard,
   Laptop,
   Receipt,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +38,24 @@ export default function PosLayout({
 
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+
+  // Network Connectivity Status (Online / Offline detector)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine);
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+  }, []);
 
   // Real-time Digital Clock (Update tiap detik)
   useEffect(() => {
@@ -79,7 +99,12 @@ export default function PosLayout({
     }
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // ignore
+    }
     Cookies.remove('access_token');
     Cookies.remove('token');
     Cookies.remove('user_role');
@@ -121,6 +146,19 @@ export default function PosLayout({
 
         {/* Sisi Tengah / Kanan: Status Shift, Jam Real-time, Nama Kasir, Owner Action, & Logout */}
         <div className="flex items-center gap-2.5 sm:gap-3 text-xs">
+          {/* Status Koneksi Jaringan */}
+          {!isOnline ? (
+            <div className="flex items-center gap-1.5 bg-red-950/80 border border-red-700/80 px-2.5 py-1 rounded-full text-red-200 text-[11px] animate-pulse">
+              <WifiOff className="w-3.5 h-3.5 text-red-400" />
+              <span className="font-medium">Koneksi Putus (Offline)</span>
+            </div>
+          ) : (
+            <div className="hidden lg:flex items-center gap-1 text-[11px] text-emerald-400/80 bg-neutral-900 border border-neutral-800 px-2 py-0.5 rounded-full">
+              <Wifi className="w-3 h-3 text-emerald-400" />
+              <span>Online</span>
+            </div>
+          )}
+
           {/* 1. Status Shift (Buka / Tutup) */}
           {isLoadingShift ? (
             <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 px-3 py-1 rounded-full text-neutral-400">

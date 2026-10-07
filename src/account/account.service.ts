@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { IssueSpDto } from './dto/issue-sp.dto';
 import { UpdateSelfDto } from './dto/update-self.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 import * as bcrypt from 'bcrypt';
 
 import { getEffectivePermissions, ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions';
@@ -75,6 +76,62 @@ export class AccountService {
     const { password, twoFactorSecret, ...cleanUser } = updatedUser;
     return {
       message: `Hak akses fitur untuk ${cleanUser.name} (${cleanUser.role}) berhasil diperbarui`,
+      user: {
+        ...cleanUser,
+        effectivePermissions: getEffectivePermissions(cleanUser),
+      },
+    };
+  }
+
+  /**
+   * OWNER: Ubah role akun karyawan (misal: KASIR -> FINANCE atau sebaliknya)
+   * Dilengkapi fail-safe pencegahan perubahan role Owner sendiri & sinkronisasi fitur default role baru.
+   */
+  async updateRole(id: string, dto: UpdateRoleDto, currentUserId?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('Karyawan tidak ditemukan');
+    }
+
+    // Fail-safe: Cegah owner mengubah role akun dirinya sendiri agar tidak terkunci
+    if (currentUserId && id === currentUserId && dto.role !== 'OWNER') {
+      throw new BadRequestException('Anda tidak dapat menurunkan role akun Anda sendiri dari OWNER');
+    }
+
+    // Jika role sama dan tidak ada penyesuaian izin khusus, kembalikan user saat ini
+    if (user.role === dto.role && !dto.permissions) {
+      return {
+        message: `Akun ${user.name} sudah memiliki role ${user.role}`,
+        user: {
+          ...user,
+          effectivePermissions: getEffectivePermissions(user),
+        },
+      };
+    }
+
+    // Tentukan permissions baru
+    let newPermissions: string[] = user.permissions || [];
+
+    if (dto.role === 'OWNER') {
+      newPermissions = []; // Owner otomatis mendapatkan 100% via getEffectivePermissions
+    } else if (dto.permissions && dto.permissions.length > 0) {
+      newPermissions = dto.permissions;
+    } else if (dto.resetPermissions !== false) {
+      // Default: Reset ke template role baru
+      newPermissions = ROLE_DEFAULT_PERMISSIONS[dto.role] || [];
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: {
+        role: dto.role,
+        permissions: newPermissions,
+      },
+    });
+
+    const { password, twoFactorSecret, ...cleanUser } = updatedUser;
+    return {
+      message: `Role untuk ${cleanUser.name} berhasil diubah dari ${user.role} menjadi ${cleanUser.role}`,
       user: {
         ...cleanUser,
         effectivePermissions: getEffectivePermissions(cleanUser),
