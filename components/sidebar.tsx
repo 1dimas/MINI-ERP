@@ -54,7 +54,7 @@ interface SingleNavItem {
 
 type NavEntry = NavGroup | SingleNavItem;
 
-export default function Sidebar() {
+function SidebarContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -608,3 +608,16 @@ export default function Sidebar() {
     </aside>
   );
 }
+
+export default function Sidebar() {
+  return (
+    <React.Suspense
+      fallback={
+        <aside className="w-64 bg-neutral-950 border-r border-neutral-800 shrink-0 h-screen sticky top-0" />
+      }
+    >
+      <SidebarContent />
+    </React.Suspense>
+  );
+}
+
